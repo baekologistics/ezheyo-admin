@@ -1,0 +1,15 @@
+.topbar {
+  height: 56px;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.title { font-size: 15px; font-weight: 500; }
+.right { display: flex; align-items: center; gap: 12px; }
+.user { font-size: 13px; color: var(--muted); }

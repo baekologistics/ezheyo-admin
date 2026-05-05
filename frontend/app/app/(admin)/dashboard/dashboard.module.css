@@ -1,0 +1,97 @@
+.page { display: flex; flex-direction: column; gap: 24px; }
+
+/* Metric cards */
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+.card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+.cardLabel { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px; }
+.cardValue { font-size: 26px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+.cardSub   { font-size: 12px; }
+
+/* Section wrapper */
+.section {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px 24px;
+}
+.sectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+.sectionTitle span { font-weight: 400; color: var(--muted); }
+
+/* Profit split */
+.splitRow { display: flex; flex-direction: column; gap: 14px; }
+.splitItem {}
+.splitHeader {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+.splitValue { font-weight: 600; }
+.barBg {
+  height: 8px;
+  background: var(--surface);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.barFill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.6s ease;
+}
+
+/* Table */
+.tableWrap { overflow-x: auto; }
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.table tr:last-child td { border-bottom: none; }
+.table tr:hover td { background: var(--surface); }
+
+.badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.badgeLabel { background: #DBEAFE; color: #1E40AF; }
+.badgeCod   { background: #FEF3C7; color: #92400E; }
+
+.mono     { font-family: monospace; font-size: 12px; color: var(--muted); }
+.positive { color: #10B981; font-weight: 500; }
+.muted    { color: var(--muted); font-size: 12px; }
+
+@media (max-width: 1024px) {
+  .metrics { grid-template-columns: repeat(2, 1fr); }
+}

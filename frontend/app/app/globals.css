@@ -1,0 +1,24 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --orange: #FD4C1D;
+  --orange-dark: #D93E14;
+  --orange-light: #FFF0EC;
+  --navy: #0F1923;
+  --text: #0F1923;
+  --muted: #6B7280;
+  --border: #E5E7EB;
+  --surface: #F9FAFB;
+  --white: #FFFFFF;
+  --sidebar-width: 220px;
+}
+
+html, body {
+  height: 100%;
+  font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  background: var(--surface);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
