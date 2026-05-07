@@ -1,4 +1,4 @@
-.page { display: flex; flex-direction: column; gap: 20px; }
+.page { display: flex; flex-direction: column; gap: 16px; }
 
 /* Stats */
 .stats { display: grid; grid-template-columns: repeat(5,1fr); gap: 14px; }
@@ -12,25 +12,29 @@
 .statLabel  { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
 .statVal    { font-size: 20px; font-weight: 700; }
 
-/* Filters */
+/* Filter rows */
 .filters { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.dateLabel { font-size: 13px; color: var(--muted); flex-shrink: 0; }
+
 .input {
   height: 38px; border: 1px solid var(--border); border-radius: 8px;
   padding: 0 12px; font-size: 13px; font-family: inherit; outline: none;
-  flex: 1; min-width: 160px;
+  flex: 1; min-width: 180px; background: var(--white);
 }
-.input:focus { border-color: var(--orange); }
+.input:focus { border-color: var(--orange); box-shadow: 0 0 0 2px rgba(253,76,29,0.08); }
+
 .select {
   height: 38px; border: 1px solid var(--border); border-radius: 8px;
   padding: 0 10px; font-size: 13px; font-family: inherit;
   background: var(--white); cursor: pointer; outline: none;
 }
-.dateSep { color: var(--muted); font-size: 13px; flex-shrink: 0; }
+
 .codToggle {
   display: flex; align-items: center; gap: 6px;
   font-size: 13px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
 }
 .codToggle input { accent-color: var(--orange); width: 15px; height: 15px; }
+
 .resetBtn {
   height: 38px; padding: 0 14px;
   border: 1px solid var(--border); border-radius: 8px;
@@ -38,6 +42,59 @@
   cursor: pointer; flex-shrink: 0; color: var(--muted);
 }
 .resetBtn:hover { background: var(--surface); }
+
+/* ── Autocomplete ─────────────────────────────────────────── */
+.acWrap {
+  position: relative;
+  flex: 1;
+  min-width: 180px;
+}
+.acInputWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.acInputWrap .input {
+  width: 100%;
+  padding-right: 30px; /* room for clear btn */
+}
+.acClear {
+  position: absolute; right: 10px;
+  background: none; border: none;
+  color: var(--muted); cursor: pointer;
+  font-size: 12px; padding: 0; line-height: 1;
+}
+.acClear:hover { color: var(--text); }
+
+.acList {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+  z-index: 100;
+  list-style: none;
+  padding: 4px 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.acAll {
+  padding: 8px 14px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+}
+.acAll:hover { background: var(--surface); }
+
+.acItem {
+  padding: 9px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.acItem:hover    { background: var(--orange-light); }
+.acSelected      { background: var(--orange-light); color: var(--orange); }
+.acItem strong   { color: var(--orange); font-weight: 600; }
 
 /* Table */
 .tableWrap {
@@ -55,23 +112,21 @@
 .table tr:last-child td { border-bottom: none; }
 .table tbody tr:hover td { background: #FAFAFA; }
 
-/* COD row highlight */
-.rowCod td { background: #FFFBEB !important; }
-.rowCod:hover td { background: #FEF3C7 !important; }
+.rowCod td        { background: #FFFBEB !important; }
+.rowCod:hover td  { background: #FEF3C7 !important; }
 
-.tracking   { font-family: monospace; font-size: 12px; color: var(--text); }
+.tracking   { font-family: monospace; font-size: 12px; }
 .muted      { color: var(--muted); font-size: 12px; }
 .profit     { color: #059669; font-weight: 600; }
 .unassigned { color: #F59E0B; font-style: italic; }
 .empty      { text-align: center; color: var(--muted); padding: 32px !important; }
 
 /* Service badges */
-.svcBadge { display: inline-block; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+.svcBadge          { display: inline-block; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
 .svc_Ground        { background: #F1F5F9; color: #475569; }
 .svc_Next_Day_Air  { background: #FEE2E2; color: #991B1B; }
 .svc_2nd_Day_Air   { background: #FEF3C7; color: #92400E; }
 
-/* COD badge */
 .codBadge {
   display: inline-block; padding: 3px 8px;
   background: #FEF3C7; color: #92400E;
@@ -80,10 +135,8 @@
 
 /* Footer totals */
 .footerRow td {
-  border-top: 2px solid var(--border);
-  border-bottom: none;
+  border-top: 2px solid var(--border); border-bottom: none;
   background: var(--surface) !important;
-  font-weight: 600;
-  padding: 11px 14px;
+  font-weight: 600; padding: 11px 14px;
 }
 .footerLabel { font-size: 12px; color: var(--muted); font-weight: 500; }
