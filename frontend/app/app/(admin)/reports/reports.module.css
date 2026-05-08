@@ -1,0 +1,223 @@
+.page { display: flex; flex-direction: column; gap: 24px; }
+
+/* ── Header ─────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.title    { font-size: 20px; font-weight: 700; color: var(--text); }
+.subtitle { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+.exportBtns { display: flex; gap: 8px; align-items: center; }
+.btnExcel {
+  height: 38px; padding: 0 16px;
+  border: 1px solid #16A34A; border-radius: 8px;
+  background: #F0FDF4; color: #16A34A;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  white-space: nowrap;
+}
+.btnExcel:hover { background: #DCFCE7; }
+.btnPdf {
+  height: 38px; padding: 0 16px;
+  border: 1px solid #DC2626; border-radius: 8px;
+  background: #FEF2F2; color: #DC2626;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  white-space: nowrap;
+}
+.btnPdf:hover { background: #FEE2E2; }
+
+/* ── Overview cards ─────────────────────────────────────────── */
+.overview {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+.overviewCard {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+}
+.cardLabel { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px; }
+.cardValue { font-size: 26px; font-weight: 700; margin-bottom: 6px; }
+.cardSub   { font-size: 12px; color: var(--muted); }
+
+/* ── Filter bar ─────────────────────────────────────────────── */
+.filterBar {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  flex-wrap: wrap;
+}
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.filterLabel { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+
+.input, .select {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--white);
+  outline: none;
+  font-family: inherit;
+  min-width: 140px;
+}
+.input:focus, .select:focus { border-color: var(--orange); }
+
+.filterMeta {
+  font-size: 12px;
+  color: var(--muted);
+  align-self: flex-end;
+  padding-bottom: 2px;
+  margin-left: auto;
+}
+
+/* ── Section (tabs + table) ─────────────────────────────────── */
+.section {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* ── Tabs ───────────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  padding: 0 4px;
+}
+.tab {
+  padding: 12px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px;
+}
+.tab:hover { color: var(--text); }
+.tabActive  {
+  color: var(--orange) !important;
+  border-bottom-color: var(--orange);
+  font-weight: 600;
+}
+
+/* ── Table ──────────────────────────────────────────────────── */
+.tableWrap { overflow-x: auto; }
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.table th {
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  white-space: nowrap;
+}
+.table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.table tr:last-child td { border-bottom: none; }
+.table tbody tr:hover td { background: #FAFAFA; }
+
+.thRight  { text-align: right !important; }
+.thCenter { text-align: center !important; }
+.tdRight  { text-align: right; }
+.tdCenter { text-align: center; }
+
+/* Footer row */
+.footRow td {
+  border-top: 2px solid var(--border);
+  border-bottom: none !important;
+  font-weight: 600;
+  background: var(--surface);
+}
+.footLabel { color: var(--muted); font-size: 12px; }
+
+/* ── Cell styles ────────────────────────────────────────────── */
+.customerName { font-weight: 500; }
+.monthCell    { font-weight: 600; white-space: nowrap; }
+.spName       { font-weight: 500; }
+
+.spBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: #EDE9FE;
+  color: #5B21B6;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.marginBadge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: #ECFDF5;
+  color: #065F46;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.commissionCell { color: #F59E0B; font-weight: 600; }
+.positive       { color: #10B981; font-weight: 600; }
+.pendingAmt     { color: #F59E0B; font-weight: 500; }
+.returnedAmt    { color: #EF4444; font-weight: 500; }
+.paidOutAmt     { color: #FD4C1D; font-weight: 600; }
+
+/* Payment badges */
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.badgePaid   { background: #D1FAE5; color: #065F46; }
+.badgeUnpaid { background: #FEE2E2; color: #991B1B; }
+
+/* Utility */
+.muted { color: var(--muted); }
+.empty { text-align: center; color: var(--muted); padding: 40px; font-size: 13px; }
+
+/* ── Responsive ─────────────────────────────────────────────── */
+@media (max-width: 1200px) {
+  .overview { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 760px) {
+  .overview    { grid-template-columns: 1fr 1fr; }
+  .filterBar   { gap: 12px; }
+  .filterMeta  { display: none; }
+  .tab         { padding: 10px 12px; font-size: 12px; }
+}
+@media (max-width: 480px) {
+  .overview { grid-template-columns: 1fr; }
+}

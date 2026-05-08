@@ -133,6 +133,27 @@
   border-radius: 20px; font-size: 11px; font-weight: 600;
 }
 
+/* COD cell: status badge + amount stacked */
+.codCell { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.codAmt  { font-size: 11.5px; font-weight: 600; color: var(--text); }
+
+.codStatusBadge {
+  display: inline-block; padding: 2px 7px; border-radius: 20px;
+  font-size: 10.5px; font-weight: 600; white-space: nowrap;
+}
+.codPending   { background: #FEF3C7; color: #92400E; }
+.codCollected { background: #D1FAE5; color: #065F46; }
+.codReturned  { background: #F3F4F6; color: #6B7280; }
+
+/* Claim status badge */
+.claimBadge {
+  display: inline-block; padding: 2px 7px; border-radius: 20px;
+  font-size: 10.5px; font-weight: 600; white-space: nowrap;
+}
+.claimClaimed  { background: #DBEAFE; color: #1E40AF; }
+.claimApproved { background: #EDE9FE; color: #5B21B6; }
+.claimPaid     { background: #D1FAE5; color: #065F46; }
+
 /* Footer totals */
 .footerRow td {
   border-top: 2px solid var(--border); border-bottom: none;

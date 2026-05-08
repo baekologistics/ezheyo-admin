@@ -120,12 +120,12 @@ const INIT_PAYMENTS: PayRecord[] = [
 ]
 
 // ── Helpers ────────────────────────────────────────────────────
-const fmt     = (n: number) => `$${n.toFixed(2)}`
-const pct     = (n: number, total: number) => total === 0 ? '0.0%' : `${((n / total) * 100).toFixed(1)}%`
-const mLabel  = (m: string) => { const [y, mo] = m.split('-'); return `${y} / ${mo}` }
+const fmt      = (n: number) => `$${n.toFixed(2)}`
+const pct      = (n: number, total: number) => total === 0 ? '0.0%' : `${((n / total) * 100).toFixed(1)}%`
+const mLabel   = (m: string) => { const [y, mo] = m.split('-'); return `${y} / ${mo}` }
 const sumLines = (lines: SplitLine[]) => lines.reduce((a, l) => a + (parseFloat(l.amount) || 0), 0)
 let _lid = 0
-const newLine = (amount = ''): SplitLine => ({ id: `L${++_lid}`, amount, method: '', date: '', memo: '' })
+const newLine  = (amount = ''): SplitLine => ({ id: `L${++_lid}`, amount, method: '', date: '', memo: '' })
 
 function computePersonCommission(month: string, person: string): number {
   return MOCK_SHIPMENTS
@@ -133,19 +133,37 @@ function computePersonCommission(month: string, person: string): number {
     .reduce((a, s) => a + (s.customerCharge - s.upsCost) * 0.10, 0)
 }
 
+// Fully-paid check: paid > 0 AND (no commission data OR paid covers ≥99% of commission)
+function isPersonPaid(month: string, person: string, payments: PayRecord[]): boolean {
+  const paid = payments
+    .filter(p => p.month === month && p.target === 'sales' && p.salesPerson === person)
+    .reduce((a, r) => a + sumLines(r.lines), 0)
+  if (paid <= 0) return false
+  const commission = computePersonCommission(month, person)
+  return commission === 0 || paid >= commission * 0.99
+}
+
+function isBaekoPaid(month: string, baekoAmt: number, payments: PayRecord[]): boolean {
+  const paid = payments
+    .filter(p => p.month === month && p.target === 'baeko')
+    .reduce((a, r) => a + sumLines(r.lines), 0)
+  return paid > 0 && paid >= baekoAmt * 0.99
+}
+
 const SHIPMENT_MONTHS = Array.from(new Set(MOCK_SHIPMENTS.map(s => s.date.slice(0, 7)))).sort().reverse()
 
 // ── Pay Modal (3-step) ─────────────────────────────────────────
-function PayModal({ history, onSave, onClose }: {
+function PayModal({ history, payments, onSave, onClose }: {
   history: HistoryRow[]
+  payments: PayRecord[]
   onSave: (r: PayRecord) => void
   onClose: () => void
 }) {
-  const [step, setStep]         = useState<1 | 2 | 3>(1)
-  const [selMonth, setSelMonth] = useState(HISTORY_MONTHS[0])
-  const [target, setTarget]     = useState<'baeko' | 'sales' | null>(null)
+  const [step, setStep]           = useState<1 | 2 | 3>(1)
+  const [selMonth, setSelMonth]   = useState(HISTORY_MONTHS[0])
+  const [target, setTarget]       = useState<'baeko' | 'sales' | null>(null)
   const [selPerson, setSelPerson] = useState('')
-  const [lines, setLines]       = useState<SplitLine[]>([newLine()])
+  const [lines, setLines]         = useState<SplitLine[]>([newLine()])
 
   const histRow = history.find(r => r.month === selMonth)
 
@@ -155,9 +173,26 @@ function PayModal({ history, onSave, onClose }: {
     return map
   }, [selMonth])
 
+  // Availability for selected month
+  const paidStatus = useMemo(() => {
+    const baekoDone = isBaekoPaid(selMonth, histRow?.baekoAmt ?? 0, payments)
+    const unpaidPersons = SALES_PERSONS.filter(p => !isPersonPaid(selMonth, p, payments))
+    const allDone = baekoDone && unpaidPersons.length === 0
+    return { baekoDone, unpaidPersons, allDone }
+  }, [selMonth, payments, histRow])
+
+  const showBaeko = !paidStatus.baekoDone
+  const showSales = paidStatus.unpaidPersons.length > 0
+
   const selectedCommission = selPerson ? (personCommissions[selPerson] ?? 0) : 0
-  const canNext2 = target === 'baeko' || (target === 'sales' && !!selPerson)
-  const total = sumLines(lines)
+  const canNext2 = (target === 'baeko' && showBaeko) || (target === 'sales' && !!selPerson)
+  const total    = sumLines(lines)
+
+  const handleMonthChange = (m: string) => {
+    setSelMonth(m)
+    setTarget(null)
+    setSelPerson('')
+  }
 
   const handleNext2 = () => {
     if (!canNext2) return
@@ -210,8 +245,7 @@ function PayModal({ history, onSave, onClose }: {
               <div className={styles.paySectionTitle}>Select Settlement Month</div>
               <div className={styles.formField}>
                 <label className={styles.fieldLabel}>Month</label>
-                <select className={styles.select} value={selMonth}
-                  onChange={e => { setSelMonth(e.target.value); setTarget(null); setSelPerson('') }}>
+                <select className={styles.select} value={selMonth} onChange={e => handleMonthChange(e.target.value)}>
                   {HISTORY_MONTHS.map(m => <option key={m} value={m}>{mLabel(m)}</option>)}
                 </select>
               </div>
@@ -238,59 +272,77 @@ function PayModal({ history, onSave, onClose }: {
           {step === 2 && (
             <div className={styles.paySection}>
               <div className={styles.paySectionTitle}>Who are you paying? — {mLabel(selMonth)}</div>
-              <div className={styles.targetOptions}>
-                {/* BAEKO option */}
-                <label className={`${styles.targetOpt} ${target === 'baeko' ? styles.targetOptOn : ''}`}>
-                  <input type="radio" name="target" value="baeko" checked={target === 'baeko'}
-                    onChange={() => { setTarget('baeko'); setSelPerson('') }} />
-                  <div className={styles.targetOptBody}>
-                    <div className={styles.targetOptName}>
-                      <span className={styles.payDot} style={{ background: '#FD4C1D' }} />
-                      BAEKO (30%)
-                    </div>
-                    <div className={styles.targetOptAmt}>{histRow ? fmt(histRow.baekoAmt) : '—'}</div>
-                  </div>
-                </label>
 
-                {/* Sales Person option */}
-                <label className={`${styles.targetOpt} ${target === 'sales' ? styles.targetOptOn : ''}`}>
-                  <input type="radio" name="target" value="sales" checked={target === 'sales'}
-                    onChange={() => setTarget('sales')} />
-                  <div className={styles.targetOptBody}>
-                    <div className={styles.targetOptName}>
-                      <span className={styles.payDot} style={{ background: '#F59E0B' }} />
-                      Sales Person (10%)
-                    </div>
-                    <div className={styles.targetOptAmt}>
-                      {histRow ? `Pool: ${fmt(histRow.salesAmt)}` : '—'}
-                    </div>
+              {/* All done */}
+              {paidStatus.allDone ? (
+                <div className={styles.allDoneBox}>
+                  <span className={styles.allDoneIcon}>✓</span>
+                  <div>
+                    <div className={styles.allDoneTitle}>All payments for this month are completed.</div>
+                    <div className={styles.allDoneSub}>Go back and select a different month.</div>
                   </div>
-                </label>
-              </div>
+                </div>
+              ) : (
+                <>
+                  <div className={styles.targetOptions}>
+                    {/* BAEKO option */}
+                    {showBaeko && (
+                      <label className={`${styles.targetOpt} ${target === 'baeko' ? styles.targetOptOn : ''}`}>
+                        <input type="radio" name="target" value="baeko" checked={target === 'baeko'}
+                          onChange={() => { setTarget('baeko'); setSelPerson('') }} />
+                        <div className={styles.targetOptBody}>
+                          <div className={styles.targetOptName}>
+                            <span className={styles.payDot} style={{ background: '#FD4C1D' }} />
+                            BAEKO (30%)
+                          </div>
+                          <div className={styles.targetOptAmt}>{histRow ? fmt(histRow.baekoAmt) : '—'}</div>
+                        </div>
+                      </label>
+                    )}
 
-              {target === 'sales' && (
-                <div className={styles.formField} style={{ marginTop: 16 }}>
-                  <label className={styles.fieldLabel}>Sales Person</label>
-                  <select className={styles.select} value={selPerson}
-                    onChange={e => setSelPerson(e.target.value)}>
-                    <option value="">Select person…</option>
-                    {SALES_PERSONS.map(p => {
-                      const c = personCommissions[p]
-                      return (
-                        <option key={p} value={p}>
-                          {p}{c > 0 ? ` — ${fmt(c)}` : ''}
-                        </option>
-                      )
-                    })}
-                  </select>
-                  {selPerson && (
-                    <div className={styles.commissionHint}>
-                      {selectedCommission > 0
-                        ? <>Commission: <strong>{fmt(selectedCommission)}</strong></>
-                        : <span style={{ color: 'var(--muted)' }}>No shipment data — enter amount manually</span>}
+                    {/* Sales Person option */}
+                    {showSales && (
+                      <label className={`${styles.targetOpt} ${target === 'sales' ? styles.targetOptOn : ''}`}>
+                        <input type="radio" name="target" value="sales" checked={target === 'sales'}
+                          onChange={() => setTarget('sales')} />
+                        <div className={styles.targetOptBody}>
+                          <div className={styles.targetOptName}>
+                            <span className={styles.payDot} style={{ background: '#F59E0B' }} />
+                            Sales Person (10%)
+                          </div>
+                          <div className={styles.targetOptAmt}>
+                            {histRow ? `Pool: ${fmt(histRow.salesAmt)}` : '—'}
+                          </div>
+                        </div>
+                      </label>
+                    )}
+                  </div>
+
+                  {target === 'sales' && (
+                    <div className={styles.formField} style={{ marginTop: 16 }}>
+                      <label className={styles.fieldLabel}>Sales Person</label>
+                      <select className={styles.select} value={selPerson}
+                        onChange={e => setSelPerson(e.target.value)}>
+                        <option value="">Select person…</option>
+                        {paidStatus.unpaidPersons.map(p => {
+                          const c = personCommissions[p]
+                          return (
+                            <option key={p} value={p}>
+                              {p}{c > 0 ? ` — ${fmt(c)}` : ''}
+                            </option>
+                          )
+                        })}
+                      </select>
+                      {selPerson && (
+                        <div className={styles.commissionHint}>
+                          {selectedCommission > 0
+                            ? <>Commission: <strong>{fmt(selectedCommission)}</strong></>
+                            : <span style={{ color: 'var(--muted)' }}>No shipment data — enter amount manually</span>}
+                        </div>
+                      )}
                     </div>
                   )}
-                </div>
+                </>
               )}
             </div>
           )}
@@ -355,9 +407,7 @@ function PayModal({ history, onSave, onClose }: {
                   onClick={() => setLines(p => [...p, newLine()])}>
                   + Add Split
                 </button>
-                <div className={styles.splitTotal}>
-                  Total: <strong>{fmt(total)}</strong>
-                </div>
+                <div className={styles.splitTotal}>Total: <strong>{fmt(total)}</strong></div>
               </div>
             </div>
           )}
@@ -372,7 +422,9 @@ function PayModal({ history, onSave, onClose }: {
           </>}
           {step === 2 && <>
             <button className={styles.btnCancel} onClick={() => setStep(1)}>← Back</button>
-            <button className={styles.btnSave} disabled={!canNext2} onClick={handleNext2}>Next →</button>
+            {!paidStatus.allDone && (
+              <button className={styles.btnSave} disabled={!canNext2} onClick={handleNext2}>Next →</button>
+            )}
           </>}
           {step === 3 && <>
             <button className={styles.btnCancel} onClick={() => setStep(2)}>← Back</button>
@@ -384,13 +436,39 @@ function PayModal({ history, onSave, onClose }: {
   )
 }
 
-// ── Detail Modal (row click) ───────────────────────────────────
-function DetailModal({ row, payments, onClose }: {
+// ── Detail Modal (row click) — with edit & delete ──────────────
+function DetailModal({ row, payments, onUpdate, onDelete, onClose }: {
   row: HistoryRow
   payments: PayRecord[]
+  onUpdate: (record: PayRecord) => void
+  onDelete: (id: string) => void
   onClose: () => void
 }) {
+  const [editingId, setEditingId]       = useState<string | null>(null)
+  const [editDraft, setEditDraft]       = useState<PayRecord | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+
   const records = payments.filter(p => p.month === row.month)
+
+  const startEdit = (rec: PayRecord) => {
+    setConfirmDeleteId(null)
+    setEditingId(rec.id)
+    setEditDraft(JSON.parse(JSON.stringify(rec)))
+  }
+
+  const cancelEdit = () => { setEditingId(null); setEditDraft(null) }
+
+  const saveEdit = () => {
+    if (editDraft) { onUpdate(editDraft); setEditingId(null); setEditDraft(null) }
+  }
+
+  const updateDraftLine = (lineId: string, patch: Partial<SplitLine>) => {
+    setEditDraft(prev => prev
+      ? { ...prev, lines: prev.lines.map(l => l.id === lineId ? { ...l, ...patch } : l) }
+      : null)
+  }
+
+  const handleDelete = (id: string) => { onDelete(id); setConfirmDeleteId(null) }
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -404,29 +482,96 @@ function DetailModal({ row, payments, onClose }: {
           {records.length === 0 ? (
             <div className={styles.empty}>No payment records for this month.</div>
           ) : (
-            records.map(rec => (
-              <div key={rec.id} className={styles.detailRecord}>
-                <div className={styles.detailRecordHead}>
-                  <span className={styles.payDot}
-                    style={{ background: rec.target === 'baeko' ? '#FD4C1D' : '#F59E0B' }} />
-                  <span className={styles.detailRecordTarget}>
-                    {rec.target === 'baeko' ? 'BAEKO (30%)' : `${rec.salesPerson} — Sales`}
-                  </span>
-                  <span className={styles.detailRecordTot}>{fmt(sumLines(rec.lines))}</span>
-                </div>
-                <div className={styles.detailLines}>
-                  {rec.lines.map((l, i) => (
-                    <div key={l.id} className={styles.detailLine}>
-                      <span className={styles.detailLineIdx}>#{i + 1}</span>
-                      <span className={styles.detailLineAmt}>{fmt(parseFloat(l.amount) || 0)}</span>
-                      <span className={`${styles.badge} ${styles.badgeMethod}`}>{l.method || '—'}</span>
-                      <span className={styles.detailLineDate}>{l.date || '—'}</span>
-                      {l.memo && <span className={styles.detailLineMemo}>{l.memo}</span>}
+            records.map(rec => {
+              const isEditing = editingId === rec.id
+              const draft     = isEditing ? editDraft! : rec
+              const isConfirmDelete = confirmDeleteId === rec.id
+
+              return (
+                <div key={rec.id} className={`${styles.detailRecord} ${isEditing ? styles.detailRecordEditing : ''}`}>
+
+                  {/* Record header */}
+                  <div className={styles.detailRecordHead}>
+                    <span className={styles.payDot}
+                      style={{ background: rec.target === 'baeko' ? '#FD4C1D' : '#F59E0B' }} />
+                    <span className={styles.detailRecordTarget}>
+                      {rec.target === 'baeko' ? 'BAEKO (30%)' : `${rec.salesPerson} — Sales`}
+                    </span>
+                    <span className={styles.detailRecordTot}>{fmt(sumLines(rec.lines))}</span>
+
+                    {/* Action buttons — hidden while editing */}
+                    {!isEditing && !isConfirmDelete && (
+                      <div className={styles.detailRecordActions}>
+                        <button className={styles.editRecBtn} onClick={() => startEdit(rec)}>Edit</button>
+                        <button className={styles.deleteRecBtn} onClick={() => setConfirmDeleteId(rec.id)}>Delete</button>
+                      </div>
+                    )}
+
+                    {/* Confirm delete */}
+                    {isConfirmDelete && (
+                      <div className={styles.confirmDelete}>
+                        <span className={styles.confirmDeleteMsg}>Delete this record?</span>
+                        <button className={styles.confirmYesBtn} onClick={() => handleDelete(rec.id)}>Yes, Delete</button>
+                        <button className={styles.confirmNoBtn} onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Lines — view or edit */}
+                  <div className={styles.detailLines}>
+                    {draft.lines.map((l, i) => (
+                      isEditing ? (
+                        /* Edit form */
+                        <div key={l.id} className={styles.editLineGrid}>
+                          <div className={styles.editLineNum}>#{i + 1}</div>
+                          <div className={styles.formField}>
+                            <label className={styles.fieldLabel}>Amount</label>
+                            <input type="number" min="0" step="0.01" className={styles.input}
+                              value={l.amount}
+                              onChange={e => updateDraftLine(l.id, { amount: e.target.value })} />
+                          </div>
+                          <div className={styles.formField}>
+                            <label className={styles.fieldLabel}>Method</label>
+                            <select className={styles.select} value={l.method}
+                              onChange={e => updateDraftLine(l.id, { method: e.target.value as PaymentMethod })}>
+                              <option value="">Select…</option>
+                              {ALL_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+                            </select>
+                          </div>
+                          <div className={styles.formField}>
+                            <label className={styles.fieldLabel}>Date</label>
+                            <input type="date" className={styles.input} value={l.date}
+                              onChange={e => updateDraftLine(l.id, { date: e.target.value })} />
+                          </div>
+                          <div className={`${styles.formField} ${styles.editLineMemo}`}>
+                            <label className={styles.fieldLabel}>Memo</label>
+                            <input type="text" className={styles.input} value={l.memo}
+                              onChange={e => updateDraftLine(l.id, { memo: e.target.value })} />
+                          </div>
+                        </div>
+                      ) : (
+                        /* View mode */
+                        <div key={l.id} className={styles.detailLine}>
+                          <span className={styles.detailLineIdx}>#{i + 1}</span>
+                          <span className={styles.detailLineAmt}>{fmt(parseFloat(l.amount) || 0)}</span>
+                          <span className={`${styles.badge} ${styles.badgeMethod}`}>{l.method || '—'}</span>
+                          <span className={styles.detailLineDate}>{l.date || '—'}</span>
+                          {l.memo && <span className={styles.detailLineMemo}>{l.memo}</span>}
+                        </div>
+                      )
+                    ))}
+                  </div>
+
+                  {/* Edit save/cancel */}
+                  {isEditing && (
+                    <div className={styles.editActions}>
+                      <button className={styles.btnCancel} onClick={cancelEdit}>Cancel</button>
+                      <button className={styles.btnSave} onClick={saveEdit}>Save Changes</button>
                     </div>
-                  ))}
+                  )}
                 </div>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
 
@@ -474,11 +619,11 @@ function SalesCell({ row, payments }: { row: HistoryRow; payments: PayRecord[] }
 
 // ── Page ──────────────────────────────────────────────────────
 export default function SettlementPage() {
-  const [month, setMonth]           = useState(SHIPMENT_MONTHS[0])
-  const [history]                   = useState<HistoryRow[]>(INIT_HISTORY)
-  const [payments, setPayments]     = useState<PayRecord[]>(INIT_PAYMENTS)
+  const [month, setMonth]               = useState(SHIPMENT_MONTHS[0])
+  const [history]                       = useState<HistoryRow[]>(INIT_HISTORY)
+  const [payments, setPayments]         = useState<PayRecord[]>(INIT_PAYMENTS)
   const [showPayModal, setShowPayModal] = useState(false)
-  const [detailRow, setDetailRow]   = useState<HistoryRow | null>(null)
+  const [detailRow, setDetailRow]       = useState<HistoryRow | null>(null)
 
   const filtered = useMemo(
     () => MOCK_SHIPMENTS.filter(s => s.date.startsWith(month)),
@@ -511,6 +656,12 @@ export default function SettlementPage() {
     { label: 'Sales (10%)',    pctVal: 10, value: totals.sales,    color: '#F59E0B' },
     { label: 'Overhead (60%)', pctVal: 60, value: totals.overhead, color: '#10B981' },
   ]
+
+  const handleUpdatePayment = (updated: PayRecord) =>
+    setPayments(prev => prev.map(p => p.id === updated.id ? updated : p))
+
+  const handleDeletePayment = (id: string) =>
+    setPayments(prev => prev.filter(p => p.id !== id))
 
   return (
     <div className={styles.page}>
@@ -649,7 +800,7 @@ export default function SettlementPage() {
       <div className={styles.section}>
         <div className={styles.sectionTitle}>
           Settlement History
-          <span className={styles.sectionHint}>Click a row to view payment records</span>
+          <span className={styles.sectionHint}>Click a row to view & edit payment records</span>
         </div>
         <div className={styles.tableWrap}>
           <table className={styles.table}>
@@ -668,8 +819,7 @@ export default function SettlementPage() {
             </thead>
             <tbody>
               {[...history].reverse().map(row => (
-                <tr key={row.month} className={styles.historyRow}
-                  onClick={() => setDetailRow(row)}>
+                <tr key={row.month} className={styles.historyRow} onClick={() => setDetailRow(row)}>
                   <td className={styles.monthCell}>{mLabel(row.month)}</td>
                   <td className={styles.tdRight}>{fmt(row.revenue)}</td>
                   <td className={`${styles.tdRight} ${styles.muted}`}>{fmt(row.upsCost)}</td>
@@ -677,12 +827,8 @@ export default function SettlementPage() {
                   <td className={styles.tdRight} style={{ color: '#FD4C1D', fontWeight: 600 }}>{fmt(row.baekoAmt)}</td>
                   <td className={styles.tdRight} style={{ color: '#F59E0B', fontWeight: 600 }}>{fmt(row.salesAmt)}</td>
                   <td className={`${styles.tdRight} ${styles.muted}`}>{fmt(row.overheadAmt)}</td>
-                  <td className={styles.tdCenter}>
-                    <BaekoCell row={row} payments={payments} />
-                  </td>
-                  <td className={styles.tdCenter}>
-                    <SalesCell row={row} payments={payments} />
-                  </td>
+                  <td className={styles.tdCenter}><BaekoCell row={row} payments={payments} /></td>
+                  <td className={styles.tdCenter}><SalesCell row={row} payments={payments} /></td>
                 </tr>
               ))}
             </tbody>
@@ -694,12 +840,19 @@ export default function SettlementPage() {
       {showPayModal && (
         <PayModal
           history={history}
+          payments={payments}
           onSave={rec => { setPayments(p => [...p, rec]); setShowPayModal(false) }}
           onClose={() => setShowPayModal(false)}
         />
       )}
       {detailRow && (
-        <DetailModal row={detailRow} payments={payments} onClose={() => setDetailRow(null)} />
+        <DetailModal
+          row={detailRow}
+          payments={payments}
+          onUpdate={handleUpdatePayment}
+          onDelete={handleDeletePayment}
+          onClose={() => setDetailRow(null)}
+        />
       )}
 
     </div>

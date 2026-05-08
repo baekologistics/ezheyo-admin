@@ -1,0 +1,222 @@
+.page { display: flex; flex-direction: column; gap: 16px; }
+
+/* ── Stats ────────────────────────────────────────────────── */
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.stat {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 18px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.statInfo   { border-color: #6366F1; background: #EEF2FF; }
+.statProfit { border-color: #10B981; background: #F0FDF4; }
+.statLabel  { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.statVal    { font-size: 20px; font-weight: 700; }
+
+/* ── Table header row ─────────────────────────────────────── */
+.tableHeader {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+}
+.tableTitle { font-size: 16px; font-weight: 700; color: var(--text); }
+.tableSub   { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.btnAdd {
+  height: 40px; padding: 0 20px;
+  background: var(--orange); color: white;
+  border: none; border-radius: 8px;
+  font-size: 13px; font-weight: 600; font-family: inherit;
+  cursor: pointer; white-space: nowrap; flex-shrink: 0;
+}
+.btnAdd:hover { background: var(--orange-dark); }
+
+/* ── Table ────────────────────────────────────────────────── */
+.tableWrap {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: 12px; overflow-x: auto;
+}
+.table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
+.table th {
+  text-align: left; padding: 10px 14px;
+  font-size: 11px; font-weight: 500; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .05em;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.table td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.table tr:last-child td { border-bottom: none; }
+.table tbody tr:hover td { background: #FAFAFA; }
+
+.thCenter { text-align: center !important; }
+.thRight  { text-align: right  !important; }
+.tracking     { font-family: monospace; font-size: 12px; }
+.mono         { font-family: monospace; font-size: 12px; }
+.muted        { color: var(--muted); }
+.bold         { font-weight: 600; }
+.customerName { font-weight: 500; }
+.empty        { text-align: center; color: var(--muted); padding: 40px !important; font-size: 13px; }
+
+/* Type badges */
+.typeBadge  { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+.typeCod    { background: #FEF3C7; color: #92400E; }
+.typeGeneral { background: #DBEAFE; color: #1E40AF; }
+
+/* Status cycle button */
+.statusBtn {
+  display: inline-block; padding: 4px 12px; border-radius: 20px;
+  font-size: 12px; font-weight: 600; font-family: inherit;
+  border: 2px solid transparent; cursor: pointer;
+  transition: filter 0.15s;
+}
+.statusBtn:hover { filter: brightness(0.92); }
+.statusClaimed  { background: #DBEAFE; color: #1E40AF; border-color: #93C5FD; }
+.statusApproved { background: #EDE9FE; color: #5B21B6; border-color: #C4B5FD; }
+.statusPaid     { background: #D1FAE5; color: #065F46; border-color: #6EE7B7; }
+
+/* Email status */
+.emailSentBadge { font-size: 12px; font-weight: 500; color: #059669; }
+.emailNotSent   { font-size: 12px; color: var(--muted); }
+
+/* Send email button */
+.sendEmailBtn {
+  height: 28px; padding: 0 10px;
+  background: var(--white); color: var(--orange);
+  border: 1px solid var(--orange); border-radius: 6px;
+  font-size: 11.5px; font-family: inherit; cursor: pointer; white-space: nowrap;
+}
+.sendEmailBtn:hover { background: var(--orange-light); }
+
+/* ── Modals ───────────────────────────────────────────────── */
+.overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.38);
+  display: flex; align-items: center; justify-content: center; z-index: 200;
+}
+.modal {
+  background: var(--white); border-radius: 14px;
+  width: 100%; max-width: 520px;
+  max-height: 90vh; overflow-y: auto;
+}
+.modalHeader {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 20px 24px 16px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--white); z-index: 1;
+}
+.modalTitle { font-size: 15px; font-weight: 600; }
+.modalSub   { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.closeBtn   { background: none; border: none; font-size: 16px; cursor: pointer; color: var(--muted); padding: 2px 6px; }
+.closeBtn:hover { color: var(--text); }
+.modalBody    { padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+.modalFooter  { display: flex; justify-content: flex-end; gap: 10px; padding: 16px 24px; border-top: 1px solid var(--border); }
+
+/* Form */
+.formField { display: flex; flex-direction: column; gap: 5px; }
+.formRow   { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.fieldLabel { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.fieldHint  { font-size: 11px; color: #F59E0B; margin-top: 2px; }
+.input {
+  height: 36px; padding: 0 10px;
+  border: 1px solid var(--border); border-radius: 7px;
+  font-size: 13px; color: var(--text); background: var(--white);
+  outline: none; font-family: inherit; width: 100%;
+}
+.input:focus { border-color: var(--orange); }
+.btnCancel {
+  height: 38px; padding: 0 18px; border: 1px solid var(--border); border-radius: 8px;
+  font-size: 13px; font-family: inherit; background: var(--white); cursor: pointer;
+}
+.btnCancel:hover { background: var(--surface); }
+.btnSave {
+  height: 38px; padding: 0 22px; border: none; border-radius: 8px;
+  background: var(--orange); color: white;
+  font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer;
+}
+.btnSave:hover    { background: var(--orange-dark); }
+.btnSave:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Email preview */
+.emailPreview { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.emailHeader  {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.emailTo      { font-size: 11px; color: var(--muted); display: block; }
+.emailSubject { font-size: 13px; font-weight: 600; display: block; margin-top: 3px; }
+.emailAmt     { font-size: 18px; font-weight: 700; color: #059669; flex-shrink: 0; }
+.emailBody    { padding: 16px; font-size: 13px; line-height: 1.7; background: white; color: var(--text); }
+.emailDetails { display: flex; flex-direction: column; gap: 6px; background: var(--surface); border-radius: 8px; padding: 12px 14px; }
+.emailDetailRow { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+.emailDetailMono { font-family: monospace; font-size: 12px; }
+
+/* ── Two-section layout ───────────────────────────────────── */
+.sectionWrap {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden;
+}
+.sectionHead {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding: 16px 18px; border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.sectionTitle { font-size: 15px; font-weight: 700; color: var(--text); }
+.sectionSub   { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+/* ── Filter bar ───────────────────────────────────────────── */
+.filterBar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 12px 18px; border-bottom: 1px solid var(--border);
+  background: var(--white);
+}
+.filterInput {
+  height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 7px;
+  font-size: 13px; color: var(--text); background: var(--white);
+  outline: none; font-family: inherit; min-width: 140px;
+}
+.filterInput:focus { border-color: var(--orange); }
+.filterSelect {
+  height: 34px; padding: 0 8px; border: 1px solid var(--border); border-radius: 7px;
+  font-size: 13px; color: var(--text); background: var(--white);
+  outline: none; font-family: inherit; cursor: pointer;
+}
+.filterSelect:focus { border-color: var(--orange); }
+.dateLabel { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+/* ── CustomerAC autocomplete ──────────────────────────────── */
+.acWrap { position: relative; min-width: 160px; }
+.acInputWrap { position: relative; display: flex; align-items: center; }
+.acInputWrap .filterInput { width: 100%; padding-right: 24px; }
+.acClear {
+  position: absolute; right: 6px; background: none; border: none;
+  font-size: 14px; color: var(--muted); cursor: pointer; line-height: 1; padding: 0;
+}
+.acClear:hover { color: var(--text); }
+.acList {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+  background: var(--white); border: 1px solid var(--border); border-radius: 8px;
+  max-height: 200px; overflow-y: auto; z-index: 100;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.10);
+}
+.acItem {
+  padding: 8px 12px; font-size: 13px; cursor: pointer; user-select: none;
+}
+.acItem:hover { background: var(--surface); }
+.acAll      { color: var(--muted); font-style: italic; }
+.acSelected { background: #FFF4EF; color: var(--orange); font-weight: 600; }
+
+/* ── Table additions ──────────────────────────────────────── */
+.actionsCell { display: flex; align-items: center; gap: 6px; }
+.editBtn {
+  height: 28px; padding: 0 10px;
+  background: var(--white); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px;
+  font-size: 11.5px; font-family: inherit; cursor: pointer; white-space: nowrap;
+}
+.editBtn:hover { background: var(--surface); }
+.rowPaid td { background: #F0FDF4 !important; }
+.rowPaid:hover td { background: #DCFCE7 !important; }
+
+/* ── Paid amount display ──────────────────────────────────── */
+.paidAmt { font-weight: 600; color: #059669; }
+
+/* ── Warning box in email modal ───────────────────────────── */
+.warningBox {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 14px; background: #FFFBEB;
+  border: 1px solid #FDE68A; border-radius: 8px;
+  font-size: 12.5px; color: #92400E; line-height: 1.5;
+}

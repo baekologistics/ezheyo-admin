@@ -12,6 +12,7 @@ const NAV = [
       { href: '/customers', label: 'Customers', icon: '👤' },
       { href: '/labels', label: 'Shipments History', icon: '📦' },
       { href: '/cod', label: 'COD Records', icon: '💳' },
+      { href: '/claims', label: 'Claims', icon: '📝' },
     ]
   },
   {

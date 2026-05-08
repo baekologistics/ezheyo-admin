@@ -308,6 +308,68 @@
 .btnSave:hover  { background: var(--orange-dark); }
 .btnSave:disabled { opacity: 0.45; cursor: not-allowed; }
 
+/* ── All-done box ───────────────────────────────────────────── */
+.allDoneBox {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 16px 18px;
+  background: #F0FDF4; border: 1px solid #A7F3D0; border-radius: 10px;
+}
+.allDoneIcon  { font-size: 20px; color: #10B981; font-weight: 700; line-height: 1.2; }
+.allDoneTitle { font-size: 14px; font-weight: 600; color: #065F46; margin-bottom: 4px; }
+.allDoneSub   { font-size: 12px; color: #10B981; }
+
+/* ── Detail record edit/delete ──────────────────────────────── */
+.detailRecordEditing {
+  background: #FFFBF0;
+  border: 1px solid #FDE68A;
+  border-radius: 10px;
+  padding: 12px;
+  margin: -2px;
+}
+.detailRecordActions { display: flex; align-items: center; gap: 6px; margin-left: 8px; }
+.editRecBtn {
+  font-size: 11px; font-weight: 500; color: var(--orange);
+  background: var(--orange-light); border: 1px solid #FECACA;
+  padding: 3px 10px; border-radius: 5px; cursor: pointer;
+}
+.editRecBtn:hover { background: #FFE4DD; }
+.deleteRecBtn {
+  font-size: 11px; font-weight: 500; color: #DC2626;
+  background: #FEF2F2; border: 1px solid #FECACA;
+  padding: 3px 10px; border-radius: 5px; cursor: pointer;
+}
+.deleteRecBtn:hover { background: #FEE2E2; }
+
+/* ── Delete confirmation ────────────────────────────────────── */
+.confirmDelete    { display: flex; align-items: center; gap: 8px; margin-left: 8px; flex-wrap: wrap; }
+.confirmDeleteMsg { font-size: 12px; color: #DC2626; font-weight: 500; }
+.confirmYesBtn {
+  font-size: 11px; font-weight: 600; color: #fff;
+  background: #DC2626; border: none;
+  padding: 3px 10px; border-radius: 5px; cursor: pointer;
+}
+.confirmYesBtn:hover { background: #B91C1C; }
+.confirmNoBtn {
+  font-size: 11px; font-weight: 500; color: var(--muted);
+  background: var(--surface); border: 1px solid var(--border);
+  padding: 3px 10px; border-radius: 5px; cursor: pointer;
+}
+.confirmNoBtn:hover { background: var(--border); }
+
+/* ── Inline edit form ───────────────────────────────────────── */
+.editLineGrid {
+  display: grid;
+  grid-template-columns: 24px 1fr 1fr 1fr;
+  gap: 8px;
+  align-items: end;
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.editLineNum  { font-size: 11px; font-weight: 600; color: var(--muted); align-self: center; padding-top: 18px; }
+.editLineMemo { grid-column: 2 / -1; }
+.editActions  { display: flex; justify-content: flex-end; gap: 8px; padding-top: 8px; }
+
 /* ── Utility ────────────────────────────────────────────────── */
 .muted    { color: var(--muted); }
 .negative { color: #EF4444; }
