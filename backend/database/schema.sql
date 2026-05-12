@@ -1,5 +1,5 @@
 -- Ezheyo Admin Database Schema
--- Run: psql -U postgres -d ezheyo_db -f database/schema.sql
+-- Run: psql -U js -d ezheyo_db -f database/schema.sql
 
 -- Enable pgcrypto for gen_random_uuid()
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -25,14 +25,16 @@ CREATE TABLE IF NOT EXISTS customers (
 );
 
 -- ─────────────────────────────────────────────────────────────
--- 2. shipments
+-- 2. orders
 -- ─────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS shipments (
+CREATE TABLE IF NOT EXISTS orders (
   id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tracking_no        VARCHAR(100) UNIQUE NOT NULL,
-  shipheyo_order_id  VARCHAR(100),
+  tracking_no        VARCHAR(100) NOT NULL,          -- first package tracking
+  shipheyo_order_id  VARCHAR(100) UNIQUE,            -- SHIPHEYO order ID (upsert key)
   date               DATE NOT NULL,
   customer_id        UUID REFERENCES customers(id) ON DELETE SET NULL,
+  customer_email     VARCHAR(200),
+  customer_name      VARCHAR(200),
   service_type       VARCHAR(50),   -- 'Ground' | 'Next Day Air' | '2nd Day Air'
   ups_cost           DECIMAL(10,2) NOT NULL DEFAULT 0,
   customer_charge    DECIMAL(10,2) NOT NULL DEFAULT 0,
@@ -41,6 +43,9 @@ CREATE TABLE IF NOT EXISTS shipments (
   cod_amount         DECIMAL(10,2) NOT NULL DEFAULT 0,
   cod_status         VARCHAR(20),   -- 'pending' | 'collected' | 'returned' | NULL
   claim_status       VARCHAR(20),   -- 'claimed' | 'approved' | 'paid' | NULL
+  total_packages     INTEGER NOT NULL DEFAULT 1,
+  packages           JSONB,         -- [{tracking_no, weight, width, length, height, ref_no, cod_amount, shipper_name, shipper_addr, receiver_name, receiver_addr}]
+  ref_no             VARCHAR(200),
   created_at         TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at         TIMESTAMP NOT NULL DEFAULT NOW()
 );
@@ -66,10 +71,10 @@ CREATE TABLE IF NOT EXISTS cod_statements (
 CREATE TABLE IF NOT EXISTS cod_records (
   id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   cod_statement_id    UUID NOT NULL REFERENCES cod_statements(id) ON DELETE CASCADE,
-  shipment_id         UUID REFERENCES shipments(id) ON DELETE SET NULL,
+  order_id            UUID REFERENCES orders(id) ON DELETE SET NULL,
   reference_no        VARCHAR(100),
   tracking_no         VARCHAR(100) NOT NULL,
-  pickup_date         DATE NOT NULL,
+  pickup_date         DATE,
   delivery_date       DATE,
   cod_amount          DECIMAL(10,2) NOT NULL DEFAULT 0,
   check_no            VARCHAR(100),
@@ -119,7 +124,7 @@ CREATE TABLE IF NOT EXISTS payment_batch_records (
 CREATE TABLE IF NOT EXISTS claims (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tracking_no   VARCHAR(100) NOT NULL,
-  shipment_id   UUID REFERENCES shipments(id) ON DELETE SET NULL,
+  order_id      UUID REFERENCES orders(id) ON DELETE SET NULL,
   customer_id   UUID REFERENCES customers(id) ON DELETE SET NULL,
   type          VARCHAR(20) NOT NULL DEFAULT 'General', -- 'COD' | 'General'
   claim_amount  DECIMAL(10,2) NOT NULL DEFAULT 0,
@@ -169,11 +174,39 @@ CREATE TABLE IF NOT EXISTS settlement_payments (
 );
 
 -- ─────────────────────────────────────────────────────────────
+-- 10. sales_persons
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS sales_persons (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name       VARCHAR(200) NOT NULL,
+  email      VARCHAR(200),
+  phone      VARCHAR(50),
+  is_active  BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 11. customer_sales  (many-to-many with ratio)
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS customer_sales (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id     UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  sales_person_id UUID NOT NULL REFERENCES sales_persons(id) ON DELETE CASCADE,
+  ratio           INTEGER NOT NULL DEFAULT 100 CHECK (ratio > 0 AND ratio <= 100),
+  created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE (customer_id, sales_person_id)
+);
+
+-- ─────────────────────────────────────────────────────────────
 -- Indexes
 -- ─────────────────────────────────────────────────────────────
-CREATE INDEX IF NOT EXISTS idx_shipments_customer    ON shipments(customer_id);
-CREATE INDEX IF NOT EXISTS idx_shipments_date        ON shipments(date);
+CREATE INDEX IF NOT EXISTS idx_orders_customer       ON orders(customer_id);
+CREATE INDEX IF NOT EXISTS idx_orders_date           ON orders(date);
+CREATE INDEX IF NOT EXISTS idx_orders_tracking       ON orders(tracking_no);
 CREATE INDEX IF NOT EXISTS idx_cod_records_statement ON cod_records(cod_statement_id);
 CREATE INDEX IF NOT EXISTS idx_cod_records_customer  ON cod_records(customer_id);
 CREATE INDEX IF NOT EXISTS idx_claims_customer       ON claims(customer_id);
 CREATE INDEX IF NOT EXISTS idx_settlement_payments_s ON settlement_payments(settlement_id);
+CREATE INDEX IF NOT EXISTS idx_customer_sales_customer ON customer_sales(customer_id);
+CREATE INDEX IF NOT EXISTS idx_customer_sales_sp       ON customer_sales(sales_person_id);

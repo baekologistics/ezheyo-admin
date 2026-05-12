@@ -140,6 +140,10 @@
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px 20px; background: var(--surface); gap: 16px;
 }
+.customerGroupHeaderUnmatched {
+  background: #FEF2F2 !important;
+  border-left: 3px solid #EF4444;
+}
 .customerGroupInfo { display: flex; align-items: center; gap: 12px; }
 .cgName  { font-size: 14px; font-weight: 600; color: var(--text); }
 .cgEmail { font-size: 12px; color: var(--muted); }

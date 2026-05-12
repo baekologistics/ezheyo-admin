@@ -1,17 +1,26 @@
 .page { display: flex; flex-direction: column; gap: 20px; }
 
 /* Stats */
-.stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; }
+.stats { display: flex; flex-wrap: wrap; gap: 12px; }
 .stat {
   background: var(--white);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 16px 20px;
+  padding: 14px 18px;
   display: flex; flex-direction: column; gap: 4px;
+  min-width: 120px;
+  flex: 1 1 120px;
 }
-.statWarn  { border-color: #F59E0B; background: #FFFBEB; }
+.statClickable {
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.statClickable:hover { border-color: var(--orange); background: var(--orange-light, #FFF7ED); }
+.statActive    { border-color: var(--orange) !important; background: #FFF7ED !important; }
+.statWarn      { border-color: #F59E0B; background: #FFFBEB; }
+.statWarn.statActive { border-color: var(--orange) !important; background: #FFF3CD !important; }
 .statVal   { font-size: 22px; font-weight: 700; }
-.statLabel { font-size: 12px; color: var(--muted); }
+.statLabel { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Toolbar */
 .toolbar { display: flex; gap: 10px; align-items: center; }
@@ -70,6 +79,13 @@
 /* Memo cell — truncate long text */
 .memoCell { max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .memoText { font-size: 12px; color: var(--text); cursor: default; }
+
+/* Sales person tags in table */
+.spName { font-size: 13px; display: inline-block; margin-right: 4px; }
+
+/* Sortable column headers */
+.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+.sortable:hover { color: var(--orange); }
 
 .editBtn {
   padding: 4px 12px;
@@ -149,3 +165,55 @@
   border-radius: 8px; font-size: 13px; font-family: inherit; cursor: pointer;
 }
 .saveBtn:hover { background: var(--orange-dark); }
+
+/* Assignment rows inside EditModal */
+.assignTable     { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+.assignRow       { display: flex; align-items: center; gap: 8px; }
+.assignSelect    {
+  flex: 1; height: 36px;
+  border: 1.5px solid var(--border); border-radius: 8px;
+  padding: 0 10px; font-size: 13px; font-family: inherit; outline: none; cursor: pointer;
+}
+.assignSelect:focus { border-color: var(--orange); }
+.assignRatioWrap { display: flex; align-items: center; gap: 3px; }
+.assignRatioInput {
+  width: 58px; height: 36px;
+  border: 1.5px solid var(--border); border-radius: 8px;
+  padding: 0 8px; font-size: 13px; font-family: inherit; outline: none;
+  text-align: right;
+}
+.assignRatioInput:focus { border-color: var(--orange); }
+.assignPct       { font-size: 13px; color: var(--muted); }
+.assignRemove    {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid var(--border); background: var(--white);
+  font-size: 11px; cursor: pointer; color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+}
+.assignRemove:hover { background: #FEF2F2; border-color: #FECACA; color: #B91C1C; }
+.assignFooter    { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+.assignAddBtn    {
+  height: 30px; padding: 0 12px;
+  border: 1px dashed var(--border); border-radius: 8px;
+  font-size: 12px; font-family: inherit; background: var(--white);
+  cursor: pointer; color: var(--orange);
+}
+.assignAddBtn:hover { background: var(--orange-light); border-color: var(--orange); }
+.assignTotal     { font-size: 12px; color: var(--muted); margin-left: auto; }
+.assignTotalErr  { color: #B91C1C; font-weight: 500; }
+
+/* Loading / Error states */
+.loadingRow {
+  padding: 48px 0;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+.errorBox {
+  padding: 12px 16px;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  color: #B91C1C;
+  font-size: 13px;
+}

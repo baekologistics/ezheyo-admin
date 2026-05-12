@@ -19,7 +19,8 @@ const NAV = [
     section: 'Finance',
     items: [
       { href: '/settlement', label: 'Settlement', icon: '📋' },
-      { href: '/reports', label: 'Reports', icon: '📈' },
+      { href: '/reports',    label: 'Reports',    icon: '📈' },
+      { href: '/settings',   label: 'Settings',   icon: '⚙️' },
     ]
   }
 ]

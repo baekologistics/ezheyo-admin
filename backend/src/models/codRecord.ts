@@ -3,7 +3,7 @@ export type QuickbookStatus = 'none' | 'bill_created' | 'paid'
 export interface CodRecord {
   id: string
   cod_statement_id: string
-  shipment_id: string | null
+  order_id: string | null
   reference_no: string
   tracking_no: string
   pickup_date: string

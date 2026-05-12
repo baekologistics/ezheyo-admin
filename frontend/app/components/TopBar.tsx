@@ -5,11 +5,12 @@ import styles from './TopBar.module.css'
 const TITLES: Record<string, string> = {
   '/dashboard': 'Dashboard',
   '/customers': 'Customers',
-  '/labels': 'Shipments History',
-  '/cod': 'COD Records',
-  '/claims': 'Claims',
-  '/settlement': 'Settlement',
-  '/reports': 'Reports',
+  '/labels':    'Shipments History',
+  '/cod':       'COD Records',
+  '/claims':    'Claims',
+  '/settlement':'Settlement',
+  '/reports':   'Reports',
+  '/settings':  'Settings',
 }
 
 export default function TopBar() {

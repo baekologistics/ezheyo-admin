@@ -1,7 +1,7 @@
 export type CodStatus   = 'pending' | 'collected' | 'returned'
 export type ClaimStatus = 'claimed' | 'approved'  | 'paid'
 
-export interface Shipment {
+export interface Order {
   id: string
   tracking_no: string
   shipheyo_order_id: string | null

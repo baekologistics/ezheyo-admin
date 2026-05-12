@@ -1,9 +1,11 @@
 'use client'
-import { useState, useMemo, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import styles from './cod.module.css'
 import EmailPreviewModal from './EmailPreviewModal'
 
-// ── Types ─────────────────────────────────────────────────────
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+
+// ── Frontend types ────────────────────────────────────────────
 export type CodRecord = {
   id: string; statementDate: string; statementNo: string
   referenceNo: string; trackingNo: string; pickupDate: string; deliveryDate: string
@@ -12,7 +14,6 @@ export type CodRecord = {
   returned: boolean; claimedPayment: boolean; emailSent: boolean
   quickbookStatus: 'none' | 'bill_created' | 'paid'; paid: boolean
 }
-// kept for PaymentHistoryModal / CodDetailModal backward compat
 export type PaymentBatch = {
   id: string; batchDate: string; customer: string; totalAmount: number
   trackingNos: string[]; status: 'pending' | 'paid'; paidDate: string; memo: string
@@ -36,33 +37,66 @@ type PaymentEntry = {
 }
 type QbGroup = { customer: string; email: string; records: CodRecord[]; qbBillNo: string }
 
+// ── API response shapes (snake_case from DB) ──────────────────
+type ApiStatement = {
+  id: string; statement_no: string; statement_date: string
+  source: string; uploaded_at: string; parsed_status: string
+  record_count: string | number
+}
+type ApiRecord = {
+  id: string; statement_no: string; statement_date: string
+  reference_no: string; tracking_no: string
+  pickup_date: string | null; delivery_date: string | null
+  cod_amount: string | number; check_no: string | null
+  service_fee: string | number; premium_fee: string | number
+  check_amount: string | number
+  customer_name: string | null; customer_email: string | null
+  returned: boolean; claimed_payment: boolean; email_sent: boolean
+  quickbook_status: 'none' | 'bill_created' | 'paid'; paid: boolean
+}
+
+// ── Mappers ───────────────────────────────────────────────────
+function mapStatement(s: ApiStatement): CodStatement {
+  return {
+    id:            s.id,
+    statementNo:   s.statement_no,
+    statementDate: s.statement_date?.slice(0, 10) ?? '',
+    source:        s.source === 'auto' ? 'Auto' : 'Manual',
+    uploadedDate:  s.uploaded_at?.slice(0, 10) ?? '',
+    parsedStatus:  s.parsed_status === 'parsed' ? 'Parsed'
+                 : s.parsed_status === 'failed'  ? 'Failed' : 'Pending',
+    recordCount:   Number(s.record_count) || 0,
+    usedInBatch:   false,
+  }
+}
+
+function mapRecord(r: ApiRecord): CodRecord {
+  return {
+    id:             r.id,
+    statementDate:  r.statement_date?.slice(0, 10) ?? '',
+    statementNo:    r.statement_no ?? '',
+    referenceNo:    r.reference_no ?? '',
+    trackingNo:     r.tracking_no ?? '',
+    pickupDate:     r.pickup_date?.slice(0, 10)   ?? '',
+    deliveryDate:   r.delivery_date?.slice(0, 10) ?? '',
+    codAmount:      Number(r.cod_amount)   || 0,
+    checkNo:        r.check_no             ?? '',
+    serviceFee:     Number(r.service_fee)  || 0,
+    premiumFee:     Number(r.premium_fee)  || 0,
+    checkAmount:    Number(r.check_amount) || 0,
+    customerEmail:  r.customer_email ?? '',
+    customer:       r.customer_name  ?? '',
+    returned:       Boolean(r.returned),
+    claimedPayment: Boolean(r.claimed_payment),
+    emailSent:      Boolean(r.email_sent),
+    quickbookStatus: r.quickbook_status ?? 'none',
+    paid:           Boolean(r.paid),
+  }
+}
+
 // ── Constants ─────────────────────────────────────────────────
 const fmt   = (n: number) => `$${n.toFixed(2)}`
 const today = () => new Date().toISOString().slice(0, 10)
-
-// ── Mock data ─────────────────────────────────────────────────
-const MOCK_RECORDS: CodRecord[] = [
-  { id:'COD001', statementDate:'2026-01-27', statementNo:'022D1-00488', referenceNo:'REF-001', trackingNo:'1Z888BB20234567895', pickupDate:'2026-01-20', deliveryDate:'2026-01-22', codAmount:320.00, checkNo:'CHK-10041', serviceFee:5.50, premiumFee:2.00, checkAmount:312.50, customerEmail:'spark@email.com', customer:'Sarah Park',  returned:false, claimedPayment:false, emailSent:true,  quickbookStatus:'bill_created', paid:false },
-  { id:'COD002', statementDate:'2026-01-27', statementNo:'022D1-00488', referenceNo:'REF-002', trackingNo:'1Z333GG70789012340', pickupDate:'2026-01-21', deliveryDate:'2026-01-23', codAmount:560.00, checkNo:'CHK-10042', serviceFee:5.50, premiumFee:2.00, checkAmount:552.50, customerEmail:'ghan@email.com',  customer:'Grace Han',   returned:false, claimedPayment:false, emailSent:false, quickbookStatus:'none',         paid:false },
-  { id:'COD003', statementDate:'2026-02-10', statementNo:'022D1-00512', referenceNo:'REF-003', trackingNo:'1Z555EE50567890128', pickupDate:'2026-02-03', deliveryDate:'2026-02-05', codAmount:180.00, checkNo:'CHK-10088', serviceFee:5.50, premiumFee:0.00, checkAmount:174.50, customerEmail:'mlee@email.com',   customer:'Mike Lee',    returned:false, claimedPayment:true,  emailSent:true,  quickbookStatus:'paid',         paid:true  },
-  { id:'COD004', statementDate:'2026-02-10', statementNo:'022D1-00512', referenceNo:'REF-004', trackingNo:'1Z000JJ01012345673', pickupDate:'2026-02-04', deliveryDate:'2026-02-06', codAmount:220.00, checkNo:'CHK-10089', serviceFee:5.50, premiumFee:2.00, checkAmount:212.50, customerEmail:'spark@email.com', customer:'Sarah Park',  returned:false, claimedPayment:false, emailSent:true,  quickbookStatus:'none',         paid:false },
-  { id:'COD005', statementDate:'2026-03-05', statementNo:'022D1-00534', referenceNo:'REF-005', trackingNo:'1Z999BB30111222333', pickupDate:'2026-02-26', deliveryDate:'2026-02-28', codAmount:450.00, checkNo:'CHK-10120', serviceFee:5.50, premiumFee:2.00, checkAmount:442.50, customerEmail:'',               customer:'',            returned:true,  claimedPayment:false, emailSent:false, quickbookStatus:'none',         paid:false },
-]
-
-const INIT_STATEMENTS: CodStatement[] = [
-  { id:'STMT001', statementNo:'022D1-00488', statementDate:'2026-01-27', source:'Manual', uploadedDate:'2026-01-28', parsedStatus:'Parsed',  recordCount:2, usedInBatch:false },
-  { id:'STMT002', statementNo:'022D1-00512', statementDate:'2026-02-10', source:'Auto',   uploadedDate:'2026-02-10', parsedStatus:'Parsed',  recordCount:2, usedInBatch:true  },
-  { id:'STMT003', statementNo:'022D1-00534', statementDate:'2026-03-05', source:'Manual', uploadedDate:'2026-03-05', parsedStatus:'Pending', recordCount:1, usedInBatch:false },
-]
-
-const INIT_EMAIL_HISTORY: EmailHistoryEntry[] = [
-  { id:'EH001', date:'2026-01-28', customer:'Sarah Park', email:'spark@email.com', statementNos:['022D1-00488'], trackingNos:['1Z888BB20234567895'], totalAmount:312.50 },
-  { id:'EH002', date:'2026-02-11', customer:'Mike Lee',   email:'mlee@email.com',  statementNos:['022D1-00512'], trackingNos:['1Z555EE50567890128'], totalAmount:174.50 },
-  { id:'EH003', date:'2026-02-11', customer:'Sarah Park', email:'spark@email.com', statementNos:['022D1-00512'], trackingNos:['1Z000JJ01012345673'], totalAmount:212.50 },
-]
-const INIT_PAY_HISTORY: PaymentEntry[] = [
-  { id:'PH001', date:'2026-02-12', customer:'Mike Lee', amount:174.50, method:'Zelle', qbBillNo:'', statementNos:['022D1-00512'], memo:'Zelle transfer', paid:true },
-]
 
 // ── QB Bill Modal ─────────────────────────────────────────────
 function QbBillModal({ groups, onConfirm, onClose }: {
@@ -158,15 +192,18 @@ function MarkPaidModal({ entry, onConfirm, onClose }: {
 
 // ── Main Page ─────────────────────────────────────────────────
 export default function CodPage() {
-  const [records,      setRecords]      = useState<CodRecord[]>(MOCK_RECORDS)
-  const [statements,   setStatements]   = useState<CodStatement[]>(INIT_STATEMENTS)
+  const [records,       setRecords]      = useState<CodRecord[]>([])
+  const [statements,    setStatements]   = useState<CodStatement[]>([])
   const [selectedStmts, setSelectedStmts] = useState<Set<string>>(new Set())
-  const [showAllStmts, setShowAllStmts] = useState(false)
-  const [emailHistory, setEmailHistory] = useState<EmailHistoryEntry[]>(INIT_EMAIL_HISTORY)
-  const [payHistory,   setPayHistory]   = useState<PaymentEntry[]>(INIT_PAY_HISTORY)
-  const [historyTab,   setHistoryTab]   = useState<'email' | 'payment'>('email')
-  const [recordSearch, setRecordSearch] = useState('')
-  const [toast,        setToast]        = useState('')
+  const [showAllStmts,  setShowAllStmts] = useState(false)
+  const [emailHistory,  setEmailHistory] = useState<EmailHistoryEntry[]>([])
+  const [payHistory,    setPayHistory]   = useState<PaymentEntry[]>([])
+  const [historyTab,    setHistoryTab]   = useState<'email' | 'payment'>('email')
+  const [recordSearch,  setRecordSearch] = useState('')
+  const [toast,         setToast]        = useState('')
+  const [loadingStmts,  setLoadingStmts] = useState(true)
+  const [loadingRecs,   setLoadingRecs]  = useState(true)
+  const [uploading,     setUploading]    = useState(false)
 
   const [emailModal,    setEmailModal]    = useState<CodRecord[] | null>(null)
   const [qbModal,       setQbModal]       = useState<QbGroup[] | null>(null)
@@ -174,11 +211,79 @@ export default function CodPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const showToast = (msg: string) => setToast(msg)
   useEffect(() => {
     if (!toast) return
-    const t = setTimeout(() => setToast(''), 3000)
+    const t = setTimeout(() => setToast(''), 4000)
     return () => clearTimeout(t)
   }, [toast])
+
+  // ── Load statements ──────────────────────────────────────────
+  const loadStatements = useCallback(async () => {
+    setLoadingStmts(true)
+    try {
+      const res = await fetch(`${API_URL}/api/cod/statements`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = (await res.json()) as ApiStatement[]
+      setStatements(data.map(mapStatement))
+    } catch (err) {
+      showToast(`Failed to load statements: ${(err as Error).message}`)
+    } finally {
+      setLoadingStmts(false)
+    }
+  }, [])
+
+  // ── Load all records (for stats + initial state) ─────────────
+  const loadAllRecords = useCallback(async () => {
+    setLoadingRecs(true)
+    try {
+      const res = await fetch(`${API_URL}/api/cod/records`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = (await res.json()) as ApiRecord[]
+      setRecords(data.map(mapRecord))
+    } catch (err) {
+      showToast(`Failed to load records: ${(err as Error).message}`)
+    } finally {
+      setLoadingRecs(false)
+    }
+  }, [])
+
+  // ── Load records for selected statements ─────────────────────
+  const loadSelectedRecords = useCallback(async (stmtIds: string[]) => {
+    if (stmtIds.length === 0) return
+    setLoadingRecs(true)
+    try {
+      const results = await Promise.all(
+        stmtIds.map(id =>
+          fetch(`${API_URL}/api/cod/records?statement_id=${id}`)
+            .then(r => r.ok ? r.json() as Promise<ApiRecord[]> : Promise.resolve([]))
+        )
+      )
+      const merged = results.flat().map(mapRecord)
+      // Merge into records: replace existing entries for these statements, keep others
+      setRecords(prev => {
+        // Keep records not belonging to any freshly-loaded statement, then append new
+        const keep = prev.filter(r => !merged.some(m => m.statementNo === r.statementNo))
+        return [...keep, ...merged]
+      })
+    } catch (err) {
+      showToast(`Failed to load records: ${(err as Error).message}`)
+    } finally {
+      setLoadingRecs(false)
+    }
+  }, [])
+
+  // ── Initial load ─────────────────────────────────────────────
+  useEffect(() => {
+    loadStatements()
+    loadAllRecords()
+  }, [loadStatements, loadAllRecords])
+
+  // ── Load records when selection changes ──────────────────────
+  useEffect(() => {
+    if (selectedStmts.size === 0) return
+    loadSelectedRecords(Array.from(selectedStmts))
+  }, [selectedStmts, loadSelectedRecords])
 
   // ── Statement display ────────────────────────────────────────
   const displayedStmts = useMemo(() => {
@@ -231,14 +336,48 @@ export default function CodPage() {
   const totalPaidOut   = payHistory.filter(p => p.paid).reduce((a, p) => a + p.amount, 0)
 
   // ── File upload ───────────────────────────────────────────────
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.[0]) return
-    setStatements(prev => [{
-      id: `STMT${Date.now()}`, statementNo: 'Parsing…', statementDate: 'Parsing…',
-      source: 'Manual', uploadedDate: today(), parsedStatus: 'Pending',
-      recordCount: 0, usedInBatch: false,
-    }, ...prev])
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
     e.target.value = ''
+
+    setUploading(true)
+    showToast('Parsing PDF…')
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const res = await fetch(`${API_URL}/api/cod/statements/upload`, {
+        method: 'POST',
+        body:   formData,
+      })
+
+      const data = await res.json() as {
+        error?: string
+        statement?: Record<string, unknown>
+        totalRecords?: number
+        matched?: number
+        unmatched?: number
+        returned?: number
+      }
+
+      if (!res.ok || data.error) {
+        showToast(`Upload failed: ${data.error ?? `HTTP ${res.status}`}`)
+        return
+      }
+
+      const { totalRecords = 0, matched = 0, unmatched = 0, returned = 0 } = data
+      showToast(
+        `Parsed ${totalRecords} records · ${matched} matched · ${unmatched} unmatched · ${returned} returned`
+      )
+
+      await Promise.all([loadStatements(), loadAllRecords()])
+    } catch (err) {
+      showToast(`Upload error: ${(err as Error).message}`)
+    } finally {
+      setUploading(false)
+    }
   }
 
   // ── Email handlers ────────────────────────────────────────────
@@ -303,19 +442,19 @@ export default function CodPage() {
       <div className={styles.stats}>
         <div className={styles.stat}>
           <span className={styles.statLabel}>Total Records</span>
-          <span className={styles.statVal}>{records.length}</span>
+          <span className={styles.statVal}>{loadingRecs ? '…' : records.length}</span>
         </div>
         <div className={styles.stat}>
           <span className={styles.statLabel}>COD Total</span>
-          <span className={styles.statVal}>{fmt(totalCod)}</span>
+          <span className={styles.statVal}>{loadingRecs ? '…' : fmt(totalCod)}</span>
         </div>
         <div className={`${styles.stat} ${unpaidCount > 0 ? styles.statWarn : ''}`}>
           <span className={styles.statLabel}>Unpaid</span>
-          <span className={styles.statVal}>{unpaidCount}</span>
+          <span className={styles.statVal}>{loadingRecs ? '…' : unpaidCount}</span>
         </div>
         <div className={`${styles.stat} ${unmatchedCount > 0 ? styles.statDanger : ''}`}>
           <span className={styles.statLabel}>Unmatched</span>
-          <span className={styles.statVal}>{unmatchedCount}</span>
+          <span className={styles.statVal}>{loadingRecs ? '…' : unmatchedCount}</span>
         </div>
         <div className={styles.stat}>
           <span className={styles.statLabel}>Total Paid Out</span>
@@ -334,10 +473,14 @@ export default function CodPage() {
             <button className={styles.showAllToggle} onClick={() => setShowAllStmts(p => !p)}>
               {showAllStmts ? 'Unpaid Only' : 'Show All'}
             </button>
-            <button className={styles.btnUpload} onClick={() => fileInputRef.current?.click()}>
-              + Upload PDF
+            <button
+              className={styles.btnUpload}
+              disabled={uploading}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {uploading ? 'Uploading…' : '+ Upload PDF'}
             </button>
-            <button className={styles.btnGmail} onClick={() => setToast('Backend connection required')}>
+            <button className={styles.btnGmail} onClick={() => showToast('Coming soon')}>
               Auto Import from Gmail
               <span className={styles.comingSoon}>Coming Soon</span>
             </button>
@@ -363,42 +506,45 @@ export default function CodPage() {
               </tr>
             </thead>
             <tbody>
-              {displayedStmts.length === 0 && (
+              {loadingStmts ? (
+                <tr><td colSpan={8} className={styles.empty}>Loading statements…</td></tr>
+              ) : displayedStmts.length === 0 ? (
                 <tr><td colSpan={8} className={styles.empty}>No statements found.</td></tr>
+              ) : (
+                displayedStmts.map(s => (
+                  <tr key={s.id}
+                    className={selectedStmts.has(s.id) ? styles.stmtRowSelected : ''}
+                    style={{ cursor: s.parsedStatus === 'Parsed' ? 'pointer' : 'default' }}
+                    onClick={() => s.parsedStatus === 'Parsed' && toggleStmt(s.id)}
+                  >
+                    <td onClick={e => e.stopPropagation()}>
+                      <input type="checkbox" checked={selectedStmts.has(s.id)}
+                        disabled={s.parsedStatus !== 'Parsed'}
+                        onChange={() => toggleStmt(s.id)} />
+                    </td>
+                    <td className={styles.stmtNo}>{s.statementNo}</td>
+                    <td className={styles.muted}>{s.statementDate}</td>
+                    <td>
+                      <span className={`${styles.sourceBadge} ${s.source === 'Auto' ? styles.sourceAuto : styles.sourceManual}`}>
+                        {s.source}
+                      </span>
+                    </td>
+                    <td className={styles.muted}>{s.uploadedDate}</td>
+                    <td>
+                      <span className={`${styles.parsedBadge} ${
+                        s.parsedStatus === 'Parsed' ? styles.parsedOk :
+                        s.parsedStatus === 'Failed' ? styles.parsedFail : styles.parsedPending
+                      }`}>{s.parsedStatus}</span>
+                    </td>
+                    <td className={styles.thCenter}>{s.recordCount > 0 ? s.recordCount : '—'}</td>
+                    <td className={styles.thCenter}>
+                      {s.usedInBatch
+                        ? <span className={styles.usedYes}>Yes</span>
+                        : <span className={styles.usedNo}>No</span>}
+                    </td>
+                  </tr>
+                ))
               )}
-              {displayedStmts.map(s => (
-                <tr key={s.id}
-                  className={selectedStmts.has(s.id) ? styles.stmtRowSelected : ''}
-                  style={{ cursor: s.parsedStatus === 'Parsed' ? 'pointer' : 'default' }}
-                  onClick={() => s.parsedStatus === 'Parsed' && toggleStmt(s.id)}
-                >
-                  <td onClick={e => e.stopPropagation()}>
-                    <input type="checkbox" checked={selectedStmts.has(s.id)}
-                      disabled={s.parsedStatus !== 'Parsed'}
-                      onChange={() => toggleStmt(s.id)} />
-                  </td>
-                  <td className={styles.stmtNo}>{s.statementNo}</td>
-                  <td className={styles.muted}>{s.statementDate}</td>
-                  <td>
-                    <span className={`${styles.sourceBadge} ${s.source === 'Auto' ? styles.sourceAuto : styles.sourceManual}`}>
-                      {s.source}
-                    </span>
-                  </td>
-                  <td className={styles.muted}>{s.uploadedDate}</td>
-                  <td>
-                    <span className={`${styles.parsedBadge} ${
-                      s.parsedStatus === 'Parsed' ? styles.parsedOk :
-                      s.parsedStatus === 'Failed' ? styles.parsedFail : styles.parsedPending
-                    }`}>{s.parsedStatus}</span>
-                  </td>
-                  <td className={styles.thCenter}>{s.recordCount > 0 ? s.recordCount : '—'}</td>
-                  <td className={styles.thCenter}>
-                    {s.usedInBatch
-                      ? <span className={styles.usedYes}>Yes</span>
-                      : <span className={styles.usedNo}>No</span>}
-                  </td>
-                </tr>
-              ))}
             </tbody>
           </table>
         </div>
@@ -427,14 +573,14 @@ export default function CodPage() {
               <button className={styles.bulkEmailBtn}
                 onClick={() => {
                   const targets = selectedRecords.filter(r => r.customer && !r.emailSent)
-                  targets.length > 0 ? setEmailModal(targets) : setToast('No new records to email')
+                  targets.length > 0 ? setEmailModal(targets) : showToast('No new records to email')
                 }}>
                 ✉ Email to All
               </button>
               <button className={styles.bulkQbBtn}
                 onClick={() => {
                   const groups = makeQbGroups(selectedRecords)
-                  groups.length > 0 ? setQbModal(groups) : setToast('No records eligible for QB bills')
+                  groups.length > 0 ? setQbModal(groups) : showToast('No records eligible for QB bills')
                 }}>
                 📒 QB Bills for All
               </button>
@@ -446,6 +592,8 @@ export default function CodPage() {
           <div className={styles.recordsEmpty}>
             ☝ Select one or more statements above to view COD records grouped by customer
           </div>
+        ) : loadingRecs ? (
+          <div className={styles.recordsEmpty}>Loading records…</div>
         ) : Object.keys(groupedRecords).length === 0 ? (
           <div className={styles.recordsEmpty}>No matching records.</div>
         ) : (
@@ -458,7 +606,7 @@ export default function CodPage() {
               const hasUnqb     = rows.some(r => r.quickbookStatus === 'none' && !r.returned)
               return (
                 <div key={key} className={styles.customerGroup}>
-                  <div className={styles.customerGroupHeader}>
+                  <div className={`${styles.customerGroupHeader} ${isUnmatched ? styles.customerGroupHeaderUnmatched : ''}`}>
                     <div className={styles.customerGroupInfo}>
                       {isUnmatched
                         ? <span className={styles.unmatchedBadge}>⚠ Unmatched Records</span>
@@ -467,27 +615,24 @@ export default function CodPage() {
                     </div>
                     <div className={styles.cgRight}>
                       <span className={styles.cgTotal}>{fmt(total)}</span>
-                      {!isUnmatched && (
-                        <>
-                          <button
-                            className={`${styles.cgBtn} ${allEmailed ? styles.cgBtnDone : ''}`}
-                            disabled={allEmailed}
-                            onClick={() => setEmailModal(rows)}
-                          >
-                            {allEmailed ? '✓ Emailed' : '✉ Send Email'}
-                          </button>
-                          <button
-                            className={`${styles.cgBtn} ${!hasUnqb ? styles.cgBtnDone : ''}`}
-                            disabled={!hasUnqb}
-                            onClick={() => {
-                              const groups = makeQbGroups(rows)
-                              if (groups.length > 0) setQbModal(groups)
-                            }}
-                          >
-                            {hasUnqb ? '📒 Create QB Bill' : '✓ QB Created'}
-                          </button>
-                        </>
-                      )}
+                      <button
+                        className={`${styles.cgBtn} ${(!isUnmatched && allEmailed) ? styles.cgBtnDone : ''}`}
+                        disabled={isUnmatched || allEmailed}
+                        onClick={() => !isUnmatched && setEmailModal(rows)}
+                      >
+                        {(!isUnmatched && allEmailed) ? '✓ Emailed' : '✉ Send Email'}
+                      </button>
+                      <button
+                        className={`${styles.cgBtn} ${(!isUnmatched && !hasUnqb) ? styles.cgBtnDone : ''}`}
+                        disabled={isUnmatched || !hasUnqb}
+                        onClick={() => {
+                          if (isUnmatched) return
+                          const groups = makeQbGroups(rows)
+                          if (groups.length > 0) setQbModal(groups)
+                        }}
+                      >
+                        {(!isUnmatched && !hasUnqb) ? '✓ QB Created' : '📒 Create QB Bill'}
+                      </button>
                     </div>
                   </div>
 

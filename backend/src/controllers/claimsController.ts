@@ -17,9 +17,9 @@ export async function getClaims(_req: Request, res: Response, next: NextFunction
 
 export async function createClaim(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { tracking_no, shipment_id, customer_id, type, claim_amount, ups_claim_no, memo } = req.body as {
+    const { tracking_no, order_id, customer_id, type, claim_amount, ups_claim_no, memo } = req.body as {
       tracking_no: string
-      shipment_id?: string
+      order_id?: string
       customer_id?: string
       type: string
       claim_amount: number
@@ -27,10 +27,10 @@ export async function createClaim(req: Request, res: Response, next: NextFunctio
       memo?: string
     }
     const result = await pool.query(
-      `INSERT INTO claims (id, tracking_no, shipment_id, customer_id, type, claim_amount, claim_status, ups_claim_no, memo)
+      `INSERT INTO claims (id, tracking_no, order_id, customer_id, type, claim_amount, claim_status, ups_claim_no, memo)
        VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, 'claimed', $6, $7)
        RETURNING *`,
-      [tracking_no, shipment_id || null, customer_id || null, type, claim_amount, ups_claim_no || null, memo || null]
+      [tracking_no, order_id || null, customer_id || null, type, claim_amount, ups_claim_no || null, memo || null]
     )
     res.status(201).json(result.rows[0])
   } catch (err) {
@@ -58,7 +58,7 @@ export async function updateClaim(req: Request, res: Response, next: NextFunctio
   }
 }
 
-export async function sendClaimEmail(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function sendClaimEmail(_req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     // TODO: send claim notification email
     res.json({ message: 'Email send not yet implemented' })

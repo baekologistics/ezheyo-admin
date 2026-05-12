@@ -1,7 +1,7 @@
 export interface Claim {
   id: string
   tracking_no: string
-  shipment_id: string | null
+  order_id: string | null
   customer_id: string | null
   type: 'COD' | 'General'
   claim_amount: number

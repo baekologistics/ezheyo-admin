@@ -7,10 +7,12 @@ import { testConnection } from './config/database'
 import { errorHandler } from './middleware/errorHandler'
 
 import customersRouter   from './routes/customers'
-import shipmentsRouter   from './routes/shipments'
+import ordersRouter      from './routes/orders'
 import codRouter         from './routes/cod'
 import claimsRouter      from './routes/claims'
 import settlementsRouter from './routes/settlements'
+import syncRouter        from './routes/sync'
+import settingsRouter    from './routes/settings'
 
 dotenv.config()
 
@@ -26,10 +28,12 @@ app.get('/api/health', (_req, res) => {
 })
 
 app.use('/api/customers',   customersRouter)
-app.use('/api/shipments',   shipmentsRouter)
+app.use('/api/orders',      ordersRouter)
 app.use('/api/cod',         codRouter)
 app.use('/api/claims',      claimsRouter)
 app.use('/api/settlements', settlementsRouter)
+app.use('/api/sync',        syncRouter)
+app.use('/api/settings',    settingsRouter)
 
 app.use(errorHandler)
 
@@ -39,6 +43,14 @@ async function main() {
   } catch {
     console.warn('⚠️  Database not connected — continuing without DB')
   }
+
+  // Start cron jobs after DB connection
+  try {
+    await import('./services/cronService')
+  } catch (err) {
+    console.warn('⚠️  Cron service failed to load:', (err as Error).message)
+  }
+
   app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`)
   })
