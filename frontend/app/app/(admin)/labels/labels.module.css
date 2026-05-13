@@ -182,6 +182,14 @@
 .accordionRow td { padding: 0 !important; border-bottom: 1px solid var(--border); }
 .accordionCell   { padding: 0 !important; background: #F8FAFC; }
 
+.accordionOrderId {
+  padding: 6px 20px 4px;
+  font-size: 11px; color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  background: #F1F5F9;
+}
+.accordionOrderId span { font-family: monospace; color: var(--text); font-weight: 500; }
+
 .pkgTable {
   width: 100%; border-collapse: collapse;
   font-size: 12px; white-space: nowrap;
