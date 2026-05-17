@@ -5,7 +5,7 @@ import { pool } from '../config/database'
 function buildFilters(q: Record<string, string | undefined>) {
   const {
     customer_id, date_from, date_to, service_type, cod_status, claim_status,
-    search, customer_name, sales_person_id,
+    search, customer_name, sales_person_id, cancelled,
   } = q
 
   const conditions: string[] = []
@@ -13,13 +13,15 @@ function buildFilters(q: Record<string, string | undefined>) {
   let   idx = 1
   let   needsCustomerSales = false
 
-  if (customer_id)      { conditions.push(`o.customer_id = $${idx++}`);         values.push(customer_id) }
-  if (date_from)        { conditions.push(`o.date >= $${idx++}`);                values.push(date_from) }
-  if (date_to)          { conditions.push(`o.date <= $${idx++}`);                values.push(date_to) }
-  if (service_type)     { conditions.push(`o.service_type = $${idx++}`);         values.push(service_type) }
-  if (cod_status)       { conditions.push(`o.cod_status = $${idx++}`);           values.push(cod_status) }
-  if (claim_status)     { conditions.push(`o.claim_status = $${idx++}`);         values.push(claim_status) }
-  if (customer_name)    { conditions.push(`c.name ILIKE $${idx++}`);             values.push(`%${customer_name}%`) }
+  if (customer_id)        { conditions.push(`o.customer_id = $${idx++}`);         values.push(customer_id) }
+  if (date_from)          { conditions.push(`o.date >= $${idx++}`);                values.push(date_from) }
+  if (date_to)            { conditions.push(`o.date <= $${idx++}`);                values.push(date_to) }
+  if (service_type)       { conditions.push(`o.service_type = $${idx++}`);         values.push(service_type) }
+  if (cod_status)         { conditions.push(`o.cod_status = $${idx++}`);           values.push(cod_status) }
+  if (claim_status)       { conditions.push(`o.claim_status = $${idx++}`);         values.push(claim_status) }
+  if (customer_name)      { conditions.push(`c.name ILIKE $${idx++}`);             values.push(`%${customer_name}%`) }
+  if (cancelled === 'true')  { conditions.push(`o.customer_charge = 0`) }
+  if (cancelled === 'false') { conditions.push(`o.customer_charge > 0`) }
   if (search) {
     conditions.push(`(o.tracking_no ILIKE $${idx} OR o.packages::text ILIKE $${idx})`)
     values.push(`%${search}%`)
@@ -65,7 +67,9 @@ export async function getOrders(req: Request, res: Response, next: NextFunction)
          COALESCE(c.email, o.customer_email) AS customer_email,
          o.customer_id,
          o.service_type,
-         o.ups_cost, o.customer_charge, o.profit,
+         CASE WHEN o.customer_charge = 0 THEN 0 ELSE o.ups_cost END AS ups_cost,
+         o.customer_charge,
+         CASE WHEN o.customer_charge = 0 THEN 0 ELSE GREATEST(o.profit, 0) END AS profit,
          o.sales_person,
          o.cod_amount, o.cod_status, o.claim_status,
          o.total_packages, o.packages
@@ -77,7 +81,16 @@ export async function getOrders(req: Request, res: Response, next: NextFunction)
       [...values, limit, offset]
     )
 
-    res.json({ orders: dataResult.rows, total, page, totalPages })
+    const orders = dataResult.rows.map((o: Record<string, unknown>) => {
+      const chg = Number(o.customer_charge) || 0
+      const ups = chg === 0 ? 0 : Number(o.ups_cost) || 0
+      return {
+        ...o,
+        ups_cost: ups,
+        profit:   chg === 0 ? 0 : Math.max(chg - ups, 0),
+      }
+    })
+    res.json({ orders, total, page, totalPages })
   } catch (err) {
     next(err)
   }
@@ -93,8 +106,8 @@ export async function getOrderStats(req: Request, res: Response, next: NextFunct
          COUNT(*)                          AS total_orders,
          COALESCE(SUM(o.total_packages),0) AS total_packages,
          COALESCE(SUM(o.customer_charge),0) AS total_revenue,
-         COALESCE(SUM(o.ups_cost),0)       AS total_ups_cost,
-         COALESCE(SUM(o.profit),0)         AS total_profit,
+         COALESCE(SUM(CASE WHEN o.customer_charge = 0 THEN 0 ELSE o.ups_cost END),0) AS total_ups_cost,
+         COALESCE(SUM(CASE WHEN o.customer_charge = 0 THEN 0 ELSE GREATEST(o.profit, 0) END),0) AS total_profit,
          COALESCE(SUM(o.cod_amount),0)     AS total_cod
        FROM orders o
        ${joinClause}

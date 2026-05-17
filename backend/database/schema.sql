@@ -210,3 +210,58 @@ CREATE INDEX IF NOT EXISTS idx_claims_customer       ON claims(customer_id);
 CREATE INDEX IF NOT EXISTS idx_settlement_payments_s ON settlement_payments(settlement_id);
 CREATE INDEX IF NOT EXISTS idx_customer_sales_customer ON customer_sales(customer_id);
 CREATE INDEX IF NOT EXISTS idx_customer_sales_sp       ON customer_sales(sales_person_id);
+
+-- ─────────────────────────────────────────────────────────────
+-- 12. request_types
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS request_types (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code        VARCHAR NOT NULL UNIQUE,
+  label       VARCHAR NOT NULL,
+  description TEXT,
+  icon        VARCHAR,
+  active      BOOLEAN DEFAULT TRUE,
+  sort_order  INTEGER DEFAULT 0,
+  created_at  TIMESTAMP DEFAULT NOW()
+);
+
+INSERT INTO request_types (code, label, description, icon, sort_order) VALUES
+  ('payment',      'Payment Request', '충전/차감 요청', '💰', 1),
+  ('void',         'Void Request',    '주문 취소 요청', '🚫', 2),
+  ('supply_order', 'Supply Order',    '용품 주문',     '📦', 3),
+  ('claim',        'Claim',           '클레임 요청',   '📋', 4)
+ON CONFLICT (code) DO NOTHING;
+
+-- ─────────────────────────────────────────────────────────────
+-- 13. customer_requests
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS customer_requests (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  request_no         SERIAL,
+  request_type_id    UUID REFERENCES request_types(id),
+  customer_id        UUID REFERENCES customers(id),
+  customer_email     VARCHAR,
+  status             VARCHAR DEFAULT 'pending',
+  title              VARCHAR,
+  description        TEXT,
+  memo               TEXT,
+  admin_memo         TEXT,
+  payment_type       VARCHAR,
+  amount             DECIMAL(10,2),
+  tracking_no        VARCHAR,
+  order_id           VARCHAR,
+  extra_data         JSONB,
+  processed_by       VARCHAR,
+  processed_at       TIMESTAMP,
+  shipheyo_synced    BOOLEAN DEFAULT FALSE,
+  shipheyo_synced_at TIMESTAMP,
+  email_sent         BOOLEAN DEFAULT FALSE,
+  email_sent_at      TIMESTAMP,
+  created_at         TIMESTAMP DEFAULT NOW(),
+  updated_at         TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_customer_requests_type   ON customer_requests(request_type_id);
+CREATE INDEX IF NOT EXISTS idx_customer_requests_cust   ON customer_requests(customer_id);
+CREATE INDEX IF NOT EXISTS idx_customer_requests_status ON customer_requests(status);
+CREATE INDEX IF NOT EXISTS idx_customer_requests_date   ON customer_requests(created_at);

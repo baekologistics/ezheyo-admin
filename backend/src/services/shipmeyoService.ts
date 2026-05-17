@@ -63,8 +63,15 @@ export interface ShipheyoMember {
   ename:         string
   email:         string
   mobile:        string
+  createdate:    string   // e.g. "2026-05-14 오전 1:06:43"
   'marginrate ': string
   payment:       string
+}
+
+/** Parse SHIPHEYO Korean AM/PM date → YYYY-MM-DD (date only) */
+export function parseShipheyoDate(raw: string): string | null {
+  const m = raw?.match(/(\d{4}-\d{2}-\d{2})/)
+  return m ? m[1] : null
 }
 
 export async function getMemberList(): Promise<ShipheyoMember[]> {

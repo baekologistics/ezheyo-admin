@@ -146,9 +146,11 @@ function mapOrder(o: ApiOrder): Order {
 }
 
 const fmt = (n: number) => `$${n.toFixed(2)}`
-const SERVICE_TYPES  = ['All', 'Ground', 'Next Day Air', '2nd Day Air']
-const COD_STATUSES   = ['All', 'Pending', 'Collected', 'Returned']
-const CLAIM_STATUSES = ['All', 'Claimed', 'Approved', 'Paid']
+const SERVICE_TYPES   = ['All', 'Ground', 'Next Day Air', '2nd Day Air']
+const COD_STATUSES    = ['All', 'Pending', 'Collected', 'Returned']
+const CLAIM_STATUSES  = ['All', 'Claimed', 'Approved', 'Paid']
+const CANCEL_FILTERS  = ['All', 'Active', 'Cancelled'] as const
+type CancelFilter = typeof CANCEL_FILTERS[number]
 const DATE_PRESETS: { value: DatePreset; label: string }[] = [
   { value: 'Custom',      label: 'Custom' },
   { value: 'RecentWeek',  label: 'Recent Week (7 days)' },
@@ -220,7 +222,7 @@ function hlite(text: string, q: string) {
 function PackageRows({ packages, orderId }: { packages: Package[]; orderId: string }) {
   return (
     <tr className={styles.accordionRow}>
-      <td colSpan={11} className={styles.accordionCell}>
+      <td colSpan={12} className={styles.accordionCell}>
         {orderId && (
           <div className={styles.accordionOrderId}>Order ID: <span>{orderId}</span></div>
         )}
@@ -280,6 +282,8 @@ export default function LabelsPage() {
   const [salesPersons, setSalesPersons] = useState<SalesPerson[]>([])
   const [stats,        setStats]        = useState<GlobalStats | null>(null)
   const [statsLoading, setStatsLoading] = useState(true)
+  const [syncing,      setSyncing]      = useState(false)
+  const [syncMsg,      setSyncMsg]      = useState('')
 
   // Filters — default: 2 months ago → today
   const defaultDates = calcPreset('Custom')   // Custom default = monthsAgo(2)~today
@@ -292,6 +296,7 @@ export default function LabelsPage() {
   const [codStatus,    setCodStatus]    = useState('All')
   const [claimStatus,  setClaimStatus]  = useState('All')
   const [salesPersonId, setSalesPersonId] = useState('')
+  const [cancelFilter, setCancelFilter] = useState<CancelFilter>('All')
 
   // ── Date preset handler ───────────────────────────────────
   const applyPreset = (preset: DatePreset) => {
@@ -314,8 +319,10 @@ export default function LabelsPage() {
     if (codStatus   !== 'All') p.set('cod_status',      codStatus.toLowerCase())
     if (claimStatus !== 'All') p.set('claim_status',    claimStatus.toLowerCase())
     if (salesPersonId)         p.set('sales_person_id', salesPersonId)
+    if (cancelFilter === 'Cancelled') p.set('cancelled', 'true')
+    if (cancelFilter === 'Active')    p.set('cancelled', 'false')
     return p
-  }, [tracking, customer, service, dateFrom, dateTo, codStatus, claimStatus, salesPersonId])
+  }, [tracking, customer, service, dateFrom, dateTo, codStatus, claimStatus, salesPersonId, cancelFilter])
 
   // ── Fetch stats (filtered) ────────────────────────────────
   const loadStats = useCallback(async () => {
@@ -381,7 +388,7 @@ export default function LabelsPage() {
     loadStats()
     loadOrders(1)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tracking, customer, service, dateFrom, dateTo, codStatus, claimStatus, salesPersonId])
+  }, [tracking, customer, service, dateFrom, dateTo, codStatus, claimStatus, salesPersonId, cancelFilter])
 
   // Page-level totals (footer row only)
   const pageTotals = useMemo(() => ({
@@ -392,6 +399,36 @@ export default function LabelsPage() {
     cod:      orders.reduce((a, o) => a + o.codAmount, 0),
   }), [orders])
 
+  // ── Manual sync ──────────────────────────────────────────
+  const syncToday = useCallback(async () => {
+    setSyncing(true)
+    setSyncMsg('')
+    try {
+      const date = today()
+      const res = await fetch(`${API_URL}/api/sync/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json() as { inserted: number; updated: number; unmatched: number; void_updated: number; void_inserted: number }
+      const parts: string[] = []
+      if (data.inserted > 0 || data.void_inserted > 0)
+        parts.push(`${data.inserted + (data.void_inserted ?? 0)} new orders`)
+      if (data.void_updated > 0)
+        parts.push(`${data.void_updated} void updates`)
+      setSyncMsg(parts.length > 0 ? `Synced: ${parts.join(', ')}` : 'Sync complete (no changes)')
+      setTimeout(() => setSyncMsg(''), 5000)
+      loadStats()
+      loadOrders(1)
+    } catch (err) {
+      setSyncMsg(`Sync failed: ${(err as Error).message}`)
+      setTimeout(() => setSyncMsg(''), 5000)
+    } finally {
+      setSyncing(false)
+    }
+  }, [loadStats, loadOrders])
+
   // ── Accordion toggle ──────────────────────────────────────
   const toggleExpand = (id: string) =>
     setExpanded(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -400,7 +437,7 @@ export default function LabelsPage() {
     setTracking(''); setCustomer(''); setService('All')
     const d = calcPreset('Custom')
     setDateFrom(d.from); setDateTo(d.to); setDatePreset('Custom')
-    setCodStatus('All'); setClaimStatus('All'); setSalesPersonId('')
+    setCodStatus('All'); setClaimStatus('All'); setSalesPersonId(''); setCancelFilter('All')
   }
 
   // ── Render ────────────────────────────────────────────────
@@ -418,6 +455,14 @@ export default function LabelsPage() {
 
   return (
     <div className={styles.page}>
+
+      {/* ── Top bar: Sync button ───────────────────────────── */}
+      <div className={styles.topBar}>
+        {syncMsg && <span className={`${styles.syncToast} ${syncMsg.startsWith('Sync failed') ? styles.syncToastErr : ''}`}>{syncMsg}</span>}
+        <button className={styles.syncBtn} onClick={syncToday} disabled={syncing}>
+          {syncing ? 'Syncing…' : '↻ Sync Today'}
+        </button>
+      </div>
 
       {/* ── Stats ──────────────────────────────────────────── */}
       <div className={styles.stats}>
@@ -463,6 +508,10 @@ export default function LabelsPage() {
           <option value=''>Sales Person: All</option>
           {salesPersons.map(sp => <option key={sp.id} value={sp.id}>{sp.name}</option>)}
         </select>
+        <select className={styles.select} value={cancelFilter}
+          onChange={e => setCancelFilter(e.target.value as CancelFilter)}>
+          {CANCEL_FILTERS.map(s => <option key={s} value={s}>{s === 'All' ? 'Status: All' : s}</option>)}
+        </select>
       </div>
 
       {/* ── Filters row 2: date preset + From/To + COD + Claim + Reset ── */}
@@ -497,6 +546,7 @@ export default function LabelsPage() {
               <th>Date</th>
               <th>Customer</th>
               <th>Service</th>
+              <th>Status</th>
               <th className={styles.thCenter}>Pkgs</th>
               <th className={styles.thRight}>Charge</th>
               <th className={styles.thRight}>UPS Cost</th>
@@ -508,20 +558,21 @@ export default function LabelsPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={11} className={styles.empty}>Loading shipments…</td></tr>
+              <tr><td colSpan={12} className={styles.empty}>Loading shipments…</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan={11} className={styles.empty}>No shipments found.</td></tr>
+              <tr><td colSpan={12} className={styles.empty}>No shipments found.</td></tr>
             ) : (
               orders.map((o, idx) => {
-                const rowNum  = (page - 1) * PAGE_LIMIT + idx + 1
-                const isOpen  = expanded.has(o.id)
-                const isMulti = o.totalPackages > 1
-                const isCod   = o.codAmount > 0
+                const rowNum     = (page - 1) * PAGE_LIMIT + idx + 1
+                const isOpen     = expanded.has(o.id)
+                const isMulti    = o.totalPackages > 1
+                const isCod      = o.codAmount > 0
+                const isCancelled = o.customerCharge === 0
                 return (
                   <React.Fragment key={o.id}>
                     <tr
                       className={[
-                        isCod ? styles.rowCod : '',
+                        isCancelled ? styles.rowCancelled : (isCod ? styles.rowCod : ''),
                         isOpen ? styles.rowExpanded : '',
                         styles.dataRow,
                       ].filter(Boolean).join(' ')}
@@ -541,20 +592,25 @@ export default function LabelsPage() {
                         </div>
                       </td>
                       <td>
-                        {o.serviceType ? (
-                          <span className={`${styles.svcBadge} ${styles['svc_' + o.serviceType.replace(/ /g, '_')]}`}>
-                            {o.serviceType}
-                          </span>
-                        ) : <span className={styles.muted}>—</span>}
+                        {o.serviceType
+                          ? <span className={`${styles.svcBadge} ${styles['svc_' + o.serviceType.replace(/ /g, '_')]}`}>{o.serviceType}</span>
+                          : <span className={styles.muted}>—</span>
+                        }
+                      </td>
+                      <td>
+                        {isCancelled
+                          ? <span className={styles.cancelBadge}>Cancelled</span>
+                          : <span className={styles.muted}>—</span>
+                        }
                       </td>
                       <td className={styles.thCenter}>
                         {isMulti
                           ? <span className={styles.pkgBadge}>×{o.totalPackages}</span>
                           : <span className={styles.muted}>1</span>}
                       </td>
-                      <td className={styles.thRight}>{fmt(o.customerCharge)}</td>
+                      <td className={`${styles.thRight} ${isCancelled ? styles.muted : ''}`}>{fmt(o.customerCharge)}</td>
                       <td className={`${styles.thRight} ${styles.muted}`}>{fmt(o.upsCost)}</td>
-                      <td className={`${styles.thRight} ${styles.profit}`}>{fmt(o.profit)}</td>
+                      <td className={`${styles.thRight} ${isCancelled ? styles.muted : styles.profit}`}>{fmt(o.profit)}</td>
                       <td className={styles.muted}>
                         {o.salesPerson || <span className={styles.unassigned}>—</span>}
                       </td>
@@ -587,7 +643,7 @@ export default function LabelsPage() {
           {!loading && orders.length > 0 && (
             <tfoot>
               <tr className={styles.footerRow}>
-                <td colSpan={4} className={styles.footerLabel}>
+                <td colSpan={5} className={styles.footerLabel}>
                   Page {page} of {totalPages} — {total.toLocaleString()} orders
                 </td>
                 <td className={styles.thCenter}>{pageTotals.packages}</td>
@@ -607,24 +663,31 @@ export default function LabelsPage() {
       {!loading && totalPages > 1 && (
         <div className={styles.pagination}>
           <button className={styles.pageBtn} disabled={page <= 1}
-            onClick={() => loadOrders(page - 1)}>← Prev</button>
+            onClick={() => loadOrders(1)} title="First page">«</button>
+          <button className={styles.pageBtn} disabled={page <= 1}
+            onClick={() => loadOrders(page - 1)} title="Previous page">‹</button>
+
           <div className={styles.pageNumbers}>
-            {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-              let p: number
-              if (totalPages <= 7)       p = i + 1
-              else if (page <= 4)        p = i + 1
-              else if (page >= totalPages - 3) p = totalPages - 6 + i
-              else                       p = page - 3 + i
-              return (
+            {(() => {
+              const WING  = 4                                       // pages each side
+              const start = Math.max(1, Math.min(page - WING, totalPages - WING * 2))
+              const end   = Math.min(totalPages, start + WING * 2)
+              return Array.from({ length: end - start + 1 }, (_, i) => start + i).map(p => (
                 <button key={p}
                   className={`${styles.pageNum} ${p === page ? styles.pageNumActive : ''}`}
                   onClick={() => loadOrders(p)}>{p}</button>
-              )
-            })}
+              ))
+            })()}
           </div>
+
           <button className={styles.pageBtn} disabled={page >= totalPages}
-            onClick={() => loadOrders(page + 1)}>Next →</button>
-          <span className={styles.pageInfo}>{total.toLocaleString()} total orders</span>
+            onClick={() => loadOrders(page + 1)} title="Next page">›</button>
+          <button className={styles.pageBtn} disabled={page >= totalPages}
+            onClick={() => loadOrders(totalPages)} title="Last page">»</button>
+
+          <span className={styles.pageInfo}>
+            총 {total.toLocaleString()}건 &nbsp;|&nbsp; {page} / {totalPages} 페이지
+          </span>
         </div>
       )}
     </div>

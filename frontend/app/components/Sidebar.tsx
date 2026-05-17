@@ -2,27 +2,52 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
+import {
+  LayoutDashboard,
+  Users,
+  Package,
+  FileText,
+  AlertCircle,
+  Inbox,
+  ClipboardList,
+  BarChart2,
+  Settings,
+} from 'lucide-react'
 import styles from './Sidebar.module.css'
 
-const NAV = [
+type NavItem = {
+  href:  string
+  label: string
+  icon:  React.ReactNode
+}
+
+type NavGroup = {
+  section: string
+  items:   NavItem[]
+}
+
+const ICON_SIZE = { width: 16, height: 16 }
+
+const NAV: NavGroup[] = [
   {
     section: 'Main',
     items: [
-      { href: '/dashboard', label: 'Dashboard', icon: '⊞' },
-      { href: '/customers', label: 'Customers', icon: '👤' },
-      { href: '/labels', label: 'Shipments History', icon: '📦' },
-      { href: '/cod', label: 'COD Records', icon: '💳' },
-      { href: '/claims', label: 'Claims', icon: '📝' },
-    ]
+      { href: '/dashboard', label: 'Dashboard',         icon: <LayoutDashboard {...ICON_SIZE} /> },
+      { href: '/customers', label: 'Customers',         icon: <Users           {...ICON_SIZE} /> },
+      { href: '/labels',    label: 'Shipments History', icon: <Package         {...ICON_SIZE} /> },
+      { href: '/cod',       label: 'COD Records',       icon: <FileText        {...ICON_SIZE} /> },
+      { href: '/claims',    label: 'Claims',            icon: <AlertCircle     {...ICON_SIZE} /> },
+      { href: '/requests',  label: 'Customer Requests', icon: <Inbox           {...ICON_SIZE} /> },
+    ],
   },
   {
     section: 'Finance',
     items: [
-      { href: '/settlement', label: 'Settlement', icon: '📋' },
-      { href: '/reports',    label: 'Reports',    icon: '📈' },
-      { href: '/settings',   label: 'Settings',   icon: '⚙️' },
-    ]
-  }
+      { href: '/settlement', label: 'Settlement', icon: <ClipboardList {...ICON_SIZE} /> },
+      { href: '/reports',    label: 'Reports',    icon: <BarChart2     {...ICON_SIZE} /> },
+      { href: '/settings',   label: 'Settings',   icon: <Settings      {...ICON_SIZE} /> },
+    ],
+  },
 ]
 
 export default function Sidebar() {
@@ -31,13 +56,19 @@ export default function Sidebar() {
   return (
     <aside className={styles.sidebar}>
       <div className={styles.logo}>
-        <Image src="/logo.png" alt="EZHEYO" width={120} height={36} style={{ objectFit: 'contain' }} />
-        <span className={styles.logoSub}>Admin</span>
+        <span className={styles.logoAdmin}>ADMIN</span>
+        <Image
+          src="/logo.png"
+          alt="EZHEYO"
+          width={110}
+          height={32}
+          style={{ objectFit: 'contain' }}
+        />
       </div>
 
       <nav className={styles.nav}>
         {NAV.map(group => (
-          <div key={group.section}>
+          <div key={group.section} className={styles.group}>
             <div className={styles.section}>{group.section}</div>
             {group.items.map(item => (
               <Link
