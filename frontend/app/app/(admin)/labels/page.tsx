@@ -285,9 +285,9 @@ export default function LabelsPage() {
   const [syncing,      setSyncing]      = useState(false)
   const [syncMsg,      setSyncMsg]      = useState('')
 
-  // Filters — default: 2 months ago → today
-  const defaultDates = calcPreset('Custom')   // Custom default = monthsAgo(2)~today
-  const [datePreset,   setDatePreset]   = useState<DatePreset>('Custom')
+  // Filters — default: recent 30 days
+  const defaultDates = calcPreset('RecentMonth')
+  const [datePreset,   setDatePreset]   = useState<DatePreset>('RecentMonth')
   const [tracking,     setTracking]     = useState('')
   const [customer,     setCustomer]     = useState('')
   const [service,      setService]      = useState('All')
@@ -435,8 +435,8 @@ export default function LabelsPage() {
 
   const reset = () => {
     setTracking(''); setCustomer(''); setService('All')
-    const d = calcPreset('Custom')
-    setDateFrom(d.from); setDateTo(d.to); setDatePreset('Custom')
+    const d = calcPreset('RecentMonth')
+    setDateFrom(d.from); setDateTo(d.to); setDatePreset('RecentMonth')
     setCodStatus('All'); setClaimStatus('All'); setSalesPersonId(''); setCancelFilter('All')
   }
 
@@ -546,7 +546,6 @@ export default function LabelsPage() {
               <th>Date</th>
               <th>Customer</th>
               <th>Service</th>
-              <th>Status</th>
               <th className={styles.thCenter}>Pkgs</th>
               <th className={styles.thRight}>Charge</th>
               <th className={styles.thRight}>UPS Cost</th>
@@ -554,6 +553,7 @@ export default function LabelsPage() {
               <th>Sales</th>
               <th>COD</th>
               <th>Claim</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody>
@@ -580,9 +580,8 @@ export default function LabelsPage() {
                       style={{ cursor: o.packages.length > 0 ? 'pointer' : 'default' }}
                     >
                       <td className={styles.thNum}>
-                        {o.packages.length > 0
-                          ? <span className={styles.expandIcon}>{isOpen ? '▾' : '▸'}</span>
-                          : rowNum}
+                        {o.packages.length > 0 && <span className={styles.expandIcon}>{isOpen ? '▾' : '▸'}</span>}
+                        <span>{rowNum}</span>
                       </td>
                       <td className={styles.muted}>{o.date}</td>
                       <td>
@@ -597,20 +596,20 @@ export default function LabelsPage() {
                           : <span className={styles.muted}>—</span>
                         }
                       </td>
-                      <td>
-                        {isCancelled
-                          ? <span className={styles.cancelBadge}>Cancelled</span>
-                          : <span className={styles.muted}>—</span>
-                        }
-                      </td>
                       <td className={styles.thCenter}>
                         {isMulti
                           ? <span className={styles.pkgBadge}>×{o.totalPackages}</span>
                           : <span className={styles.muted}>1</span>}
                       </td>
-                      <td className={`${styles.thRight} ${isCancelled ? styles.muted : ''}`}>{fmt(o.customerCharge)}</td>
-                      <td className={`${styles.thRight} ${styles.muted}`}>{fmt(o.upsCost)}</td>
-                      <td className={`${styles.thRight} ${isCancelled ? styles.muted : styles.profit}`}>{fmt(o.profit)}</td>
+                      <td className={`${styles.thRight} ${isCancelled ? styles.muted : ''}`}>
+                        {isCancelled ? '—' : fmt(o.customerCharge)}
+                      </td>
+                      <td className={`${styles.thRight} ${styles.muted}`}>
+                        {isCancelled ? '—' : fmt(o.upsCost)}
+                      </td>
+                      <td className={`${styles.thRight} ${isCancelled ? styles.muted : styles.profit}`}>
+                        {isCancelled ? '—' : fmt(o.profit)}
+                      </td>
                       <td className={styles.muted}>
                         {o.salesPerson || <span className={styles.unassigned}>—</span>}
                       </td>
@@ -633,6 +632,12 @@ export default function LabelsPage() {
                           }`}>{o.claimStatus}</span>
                         ) : <span className={styles.muted}>—</span>}
                       </td>
+                      <td>
+                        {isCancelled
+                          ? <span className={styles.cancelBadge}>Cancelled</span>
+                          : <span className={styles.muted}>—</span>
+                        }
+                      </td>
                     </tr>
                     {isOpen && <PackageRows packages={o.packages} orderId={o.orderId} />}
                   </React.Fragment>
@@ -643,7 +648,7 @@ export default function LabelsPage() {
           {!loading && orders.length > 0 && (
             <tfoot>
               <tr className={styles.footerRow}>
-                <td colSpan={5} className={styles.footerLabel}>
+                <td colSpan={4} className={styles.footerLabel}>
                   Page {page} of {totalPages} — {total.toLocaleString()} orders
                 </td>
                 <td className={styles.thCenter}>{pageTotals.packages}</td>
@@ -652,6 +657,7 @@ export default function LabelsPage() {
                 <td className={`${styles.thRight} ${styles.profit}`}>{fmt(pageTotals.profit)}</td>
                 <td></td>
                 <td>{pageTotals.cod > 0 ? <span className={styles.codBadge}>{fmt(pageTotals.cod)}</span> : '—'}</td>
+                <td></td>
                 <td></td>
               </tr>
             </tfoot>

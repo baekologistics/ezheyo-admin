@@ -1,229 +1,295 @@
 'use client'
-import { useState, useMemo } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import * as XLSX from 'xlsx'
 import styles from './settlement.module.css'
 
-// ── Types ──────────────────────────────────────────────────────
+const HISTORY_START = '2024-12'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+
+// ── Types ────────────────────────────────────────────────────────
 type PaymentMethod = 'Zelle' | 'Check' | 'Wire' | 'ACH' | 'Cash' | ''
+const ALL_METHODS: PaymentMethod[] = ['Zelle', 'Check', 'Wire', 'ACH', 'Cash']
 
 type SplitLine = {
-  id: string
-  amount: string
-  method: PaymentMethod
-  date: string
-  memo: string
+  id: string; amount: string; method: PaymentMethod; date: string; memo: string
 }
 
-type PayRecord = {
+type ApiPayment = {
   id: string
+  settlement_id: string
+  recipient_type: 'baeko' | 'sales_person'
+  sales_person: string | null
+  amount: string | number
+  method: string
+  paid_date: string
+  memo: string | null
+  created_at: string
+}
+
+type SalesPersonRow = {
+  sales_person_id: string
+  sales_person: string
+  shipments: number
+  revenue: string | number
+  ups_cost: string | number
+  profit: string | number
+  commission: string | number
+}
+
+type SpCommission = {
+  name: string
+  commission: number
+  paid: boolean
+  paidAmount: number
+}
+
+type MonthData = {
   month: string
-  target: 'baeko' | 'sales'
-  salesPerson: string
-  lines: SplitLine[]
+  settlement_id: string | null
+  shipments: number
+  revenue: string | number
+  ups_cost: string | number
+  net_profit: string | number
+  baeko_amount: string | number
+  sales_amount: string | number
+  overhead_amount: string | number
+  sales_persons: SalesPersonRow[]
+  payments: ApiPayment[]
 }
 
-type Shipment = {
-  id: string; date: string; trackingNo: string; customer: string
-  salesPerson: string; customerCharge: number; upsCost: number
+type RangeData = {
+  from: string
+  to: string
+  shipments: number
+  revenue: string | number
+  ups_cost: string | number
+  net_profit: string | number
+  baeko_amount: string | number
+  sales_amount: string | number
+  overhead_amount: string | number
+  sales_persons: SalesPersonRow[]
 }
 
 type HistoryRow = {
-  month: string; revenue: number; upsCost: number
-  netProfit: number; baekoAmt: number; salesAmt: number; overheadAmt: number
+  month: string
+  shipments: number
+  revenue: string | number
+  ups_cost: string | number
+  net_profit: string | number
+  baeko_amount: string | number
+  sales_amount: string | number
+  overhead_amount: string | number
+  settlement_id: string | null
+  payments: ApiPayment[]
+  salesPersonCommissions: SpCommission[]
 }
 
-// ── Constants ──────────────────────────────────────────────────
-const SALES_PERSONS = ['Alice Yoon', 'Brian Cho', 'Carol Lim', 'David Park']
-const ALL_METHODS: PaymentMethod[] = ['Zelle', 'Check', 'Wire', 'ACH', 'Cash']
-const HISTORY_MONTHS = ['2026-02', '2026-01', '2025-12', '2025-11']
-
-// ── Mock Shipments ─────────────────────────────────────────────
-const MOCK_SHIPMENTS: Shipment[] = [
-  // 2026-01
-  { id:'S001', date:'2026-01-03', trackingNo:'1Z999AA10123456784', customer:'Jung Kim',   salesPerson:'Alice Yoon', customerCharge:28.40, upsCost:18.20 },
-  { id:'S002', date:'2026-01-05', trackingNo:'1Z888BB20234567895', customer:'Sarah Park', salesPerson:'Alice Yoon', customerCharge:54.10, upsCost:38.60 },
-  { id:'S003', date:'2026-01-08', trackingNo:'1Z777CC30345678906', customer:'Mike Lee',   salesPerson:'Brian Cho',  customerCharge:19.80, upsCost:12.40 },
-  { id:'S004', date:'2026-01-12', trackingNo:'1Z666DD40456789017', customer:'Helen Cho',  salesPerson:'Alice Yoon', customerCharge:42.00, upsCost:29.50 },
-  { id:'S005', date:'2026-01-15', trackingNo:'1Z555EE50567890128', customer:'Grace Han',  salesPerson:'Brian Cho',  customerCharge:33.60, upsCost:21.80 },
-  { id:'S006', date:'2026-01-18', trackingNo:'1Z444FF60678901239', customer:'Tom Shin',   salesPerson:'Carol Lim',  customerCharge:61.20, upsCost:44.30 },
-  { id:'S007', date:'2026-01-20', trackingNo:'1Z333GG70789012340', customer:'Jane Oh',    salesPerson:'Carol Lim',  customerCharge:25.50, upsCost:16.70 },
-  { id:'S008', date:'2026-01-22', trackingNo:'1Z222HH80890123451', customer:'David Kang', salesPerson:'Alice Yoon', customerCharge:47.90, upsCost:33.10 },
-  { id:'S009', date:'2026-01-25', trackingNo:'1Z111II90901234562', customer:'Lucy Yim',   salesPerson:'Brian Cho',  customerCharge:38.00, upsCost:25.60 },
-  { id:'S010', date:'2026-01-28', trackingNo:'1Z000JJ01012345673', customer:'Kevin Park', salesPerson:'Carol Lim',  customerCharge:72.40, upsCost:51.20 },
-  // 2026-02
-  { id:'S011', date:'2026-02-02', trackingNo:'1Z999AA11234567891', customer:'Jung Kim',   salesPerson:'Alice Yoon', customerCharge:31.60, upsCost:20.40 },
-  { id:'S012', date:'2026-02-05', trackingNo:'1Z888BB21234567892', customer:'Sarah Park', salesPerson:'Alice Yoon', customerCharge:58.20, upsCost:41.30 },
-  { id:'S013', date:'2026-02-07', trackingNo:'1Z777CC31234567893', customer:'Tom Shin',   salesPerson:'Carol Lim',  customerCharge:45.80, upsCost:31.60 },
-  { id:'S014', date:'2026-02-10', trackingNo:'1Z666DD41234567894', customer:'Mike Lee',   salesPerson:'Brian Cho',  customerCharge:22.40, upsCost:14.80 },
-  { id:'S015', date:'2026-02-12', trackingNo:'1Z555EE51234567895', customer:'Grace Han',  salesPerson:'Brian Cho',  customerCharge:67.10, upsCost:48.20 },
-  { id:'S016', date:'2026-02-14', trackingNo:'1Z444FF61234567896', customer:'David Kang', salesPerson:'Alice Yoon', customerCharge:39.50, upsCost:26.90 },
-  { id:'S017', date:'2026-02-17', trackingNo:'1Z333GG71234567897', customer:'Kevin Park', salesPerson:'Carol Lim',  customerCharge:83.00, upsCost:60.10 },
-  { id:'S018', date:'2026-02-19', trackingNo:'1Z222HH81234567898', customer:'Helen Cho',  salesPerson:'Alice Yoon', customerCharge:29.80, upsCost:19.20 },
-  { id:'S019', date:'2026-02-21', trackingNo:'1Z111II91234567899', customer:'Lucy Yim',   salesPerson:'Brian Cho',  customerCharge:54.60, upsCost:38.40 },
-  { id:'S020', date:'2026-02-24', trackingNo:'1Z000JJ01234567900', customer:'Jane Oh',    salesPerson:'Carol Lim',  customerCharge:36.20, upsCost:24.50 },
-  { id:'S021', date:'2026-02-26', trackingNo:'1Z999AA21234567901', customer:'Jung Kim',   salesPerson:'Alice Yoon', customerCharge:44.70, upsCost:30.80 },
-  // 2026-03
-  { id:'S022', date:'2026-03-03', trackingNo:'1Z888BB31234567902', customer:'Sarah Park', salesPerson:'Alice Yoon', customerCharge:62.30, upsCost:44.80 },
-  { id:'S023', date:'2026-03-05', trackingNo:'1Z777CC31234567903', customer:'Tom Shin',   salesPerson:'Carol Lim',  customerCharge:50.10, upsCost:35.60 },
-  { id:'S024', date:'2026-03-07', trackingNo:'1Z666DD41234567904', customer:'Grace Han',  salesPerson:'Brian Cho',  customerCharge:27.90, upsCost:18.10 },
-  { id:'S025', date:'2026-03-10', trackingNo:'1Z555EE51234567905', customer:'Kevin Park', salesPerson:'Carol Lim',  customerCharge:91.40, upsCost:66.30 },
-  { id:'S026', date:'2026-03-12', trackingNo:'1Z444FF61234567906', customer:'Mike Lee',   salesPerson:'Brian Cho',  customerCharge:34.20, upsCost:22.50 },
-  { id:'S027', date:'2026-03-14', trackingNo:'1Z333GG71234567907', customer:'David Kang', salesPerson:'Alice Yoon', customerCharge:48.80, upsCost:33.70 },
-  { id:'S028', date:'2026-03-17', trackingNo:'1Z222HH81234567908', customer:'Lucy Yim',   salesPerson:'Brian Cho',  customerCharge:71.50, upsCost:51.90 },
-  { id:'S029', date:'2026-03-19', trackingNo:'1Z111II91234567909', customer:'Helen Cho',  salesPerson:'Alice Yoon', customerCharge:23.60, upsCost:15.40 },
-  { id:'S030', date:'2026-03-21', trackingNo:'1Z000JJ01234567910', customer:'Jane Oh',    salesPerson:'Carol Lim',  customerCharge:55.80, upsCost:39.20 },
-  { id:'S031', date:'2026-03-24', trackingNo:'1Z999AA31234567911', customer:'Jung Kim',   salesPerson:'Alice Yoon', customerCharge:38.90, upsCost:26.10 },
-  { id:'S032', date:'2026-03-26', trackingNo:'1Z888BB41234567912', customer:'Sarah Park', salesPerson:'Alice Yoon', customerCharge:66.40, upsCost:47.60 },
-  { id:'S033', date:'2026-03-28', trackingNo:'1Z777CC41234567913', customer:'Tom Shin',   salesPerson:'Carol Lim',  customerCharge:43.70, upsCost:29.90 },
-  // 2026-04
-  { id:'S034', date:'2026-04-01', trackingNo:'1Z666DD51234567914', customer:'Kevin Park', salesPerson:'Carol Lim',  customerCharge:78.20, upsCost:56.10 },
-  { id:'S035', date:'2026-04-03', trackingNo:'1Z555EE61234567915', customer:'Grace Han',  salesPerson:'Brian Cho',  customerCharge:31.50, upsCost:20.80 },
-  { id:'S036', date:'2026-04-05', trackingNo:'1Z444FF71234567916', customer:'Mike Lee',   salesPerson:'Brian Cho',  customerCharge:19.60, upsCost:12.30 },
-  { id:'S037', date:'2026-04-08', trackingNo:'1Z333GG81234567917', customer:'David Kang', salesPerson:'Alice Yoon', customerCharge:53.40, upsCost:37.80 },
-  { id:'S038', date:'2026-04-10', trackingNo:'1Z222HH91234567918', customer:'Lucy Yim',   salesPerson:'Brian Cho',  customerCharge:44.90, upsCost:31.20 },
-  { id:'S039', date:'2026-04-12', trackingNo:'1Z111II01234567919', customer:'Helen Cho',  salesPerson:'Alice Yoon', customerCharge:36.70, upsCost:24.50 },
-  { id:'S040', date:'2026-04-14', trackingNo:'1Z000JJ11234567920', customer:'Jane Oh',    salesPerson:'Carol Lim',  customerCharge:62.80, upsCost:44.90 },
-  { id:'S041', date:'2026-04-16', trackingNo:'1Z999AA41234567921', customer:'Jung Kim',   salesPerson:'Alice Yoon', customerCharge:27.30, upsCost:17.60 },
-  { id:'S042', date:'2026-04-18', trackingNo:'1Z888BB51234567922', customer:'Sarah Park', salesPerson:'Alice Yoon', customerCharge:71.60, upsCost:51.40 },
-  { id:'S043', date:'2026-04-21', trackingNo:'1Z777CC51234567923', customer:'Tom Shin',   salesPerson:'Carol Lim',  customerCharge:49.30, upsCost:34.70 },
-  { id:'S044', date:'2026-04-23', trackingNo:'1Z666DD61234567924', customer:'Kevin Park', salesPerson:'Carol Lim',  customerCharge:85.10, upsCost:61.80 },
-  { id:'S045', date:'2026-04-25', trackingNo:'1Z555EE71234567925', customer:'Grace Han',  salesPerson:'Brian Cho',  customerCharge:40.20, upsCost:27.40 },
-  // 2026-05
-  { id:'S046', date:'2026-05-01', trackingNo:'1Z444FF81234567926', customer:'Mike Lee',   salesPerson:'Brian Cho',  customerCharge:24.80, upsCost:16.10 },
-  { id:'S047', date:'2026-05-02', trackingNo:'1Z333GG91234567927', customer:'David Kang', salesPerson:'Alice Yoon', customerCharge:58.60, upsCost:41.70 },
-  { id:'S048', date:'2026-05-03', trackingNo:'1Z222HH01234567928', customer:'Lucy Yim',   salesPerson:'Brian Cho',  customerCharge:47.30, upsCost:33.40 },
-  { id:'S049', date:'2026-05-05', trackingNo:'1Z111II11234567929', customer:'Jung Kim',   salesPerson:'Alice Yoon', customerCharge:35.90, upsCost:23.60 },
-  { id:'S050', date:'2026-05-06', trackingNo:'1Z000JJ21234567930', customer:'Sarah Park', salesPerson:'Alice Yoon', customerCharge:69.40, upsCost:49.80 },
-]
-
-// ── Mock History ───────────────────────────────────────────────
-function makeRow(month: string, revenue: number, upsCost: number): HistoryRow {
-  const netProfit = revenue - upsCost
-  return { month, revenue, upsCost, netProfit, baekoAmt: netProfit * 0.30, salesAmt: netProfit * 0.10, overheadAmt: netProfit * 0.60 }
+type SummarySpRow = {
+  name: string
+  totalEarned: number
+  totalPaid: number
+  totalUnpaid: number
 }
-const INIT_HISTORY: HistoryRow[] = [
-  makeRow('2025-11', 3840.50, 2620.30),
-  makeRow('2025-12', 4510.80, 3120.60),
-  makeRow('2026-01',  422.90,  291.40),
-  makeRow('2026-02',  512.90,  356.20),
-]
 
-// ── Mock Payments ──────────────────────────────────────────────
-const INIT_PAYMENTS: PayRecord[] = [
-  { id:'PR001', month:'2025-11', target:'baeko',  salesPerson:'',
-    lines:[{ id:'PL001', amount:'366.06', method:'Zelle', date:'2025-12-05', memo:'Nov settlement paid' }] },
-  { id:'PR002', month:'2025-11', target:'sales',  salesPerson:'Alice Yoon',
-    lines:[{ id:'PL002', amount:'73.21',  method:'Zelle', date:'2025-12-05', memo:'Nov commission' }] },
-  { id:'PR003', month:'2025-11', target:'sales',  salesPerson:'Brian Cho',
-    lines:[{ id:'PL003', amount:'48.81',  method:'Zelle', date:'2025-12-05', memo:'Nov commission' }] },
-  { id:'PR004', month:'2025-12', target:'baeko',  salesPerson:'',
-    lines:[{ id:'PL004', amount:'417.06', method:'Check', date:'2026-01-08', memo:'Dec settlement paid' }] },
-]
+type SummaryData = {
+  baeko: { totalEarned: number; totalPaid: number; totalUnpaid: number }
+  salesPersons: SummarySpRow[]
+  totalPaid: number
+  totalUnpaid: number
+}
 
-// ── Helpers ────────────────────────────────────────────────────
+// Shared "display data" shape used by cards / distribution / commission table
+type DisplayData = {
+  shipments: number
+  revenue: string | number
+  ups_cost: string | number
+  net_profit: string | number
+  baeko_amount: string | number
+  sales_amount: string | number
+  overhead_amount: string | number
+  sales_persons: SalesPersonRow[]
+}
+
+// ── Helpers ──────────────────────────────────────────────────────
 const fmt      = (n: number) => `$${n.toFixed(2)}`
+const n2       = (v: string | number | null | undefined) => Number(v) || 0
 const pct      = (n: number, total: number) => total === 0 ? '0.0%' : `${((n / total) * 100).toFixed(1)}%`
 const mLabel   = (m: string) => { const [y, mo] = m.split('-'); return `${y} / ${mo}` }
-const sumLines = (lines: SplitLine[]) => lines.reduce((a, l) => a + (parseFloat(l.amount) || 0), 0)
+const sumLines = (ls: SplitLine[]) => ls.reduce((a, l) => a + (parseFloat(l.amount) || 0), 0)
+const payTotal = (ps: ApiPayment[]) => ps.reduce((a, p) => a + n2(p.amount), 0)
 let _lid = 0
 const newLine  = (amount = ''): SplitLine => ({ id: `L${++_lid}`, amount, method: '', date: '', memo: '' })
 
-function computePersonCommission(month: string, person: string): number {
-  return MOCK_SHIPMENTS
-    .filter(s => s.date.startsWith(month) && s.salesPerson === person)
-    .reduce((a, s) => a + (s.customerCharge - s.upsCost) * 0.10, 0)
+function thisMonthStr() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+function todayStr() {
+  return new Date().toISOString().slice(0, 10)
+}
+function firstDayOfMonth() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
 }
 
-// Fully-paid check: paid > 0 AND (no commission data OR paid covers ≥99% of commission)
-function isPersonPaid(month: string, person: string, payments: PayRecord[]): boolean {
-  const paid = payments
-    .filter(p => p.month === month && p.target === 'sales' && p.salesPerson === person)
-    .reduce((a, r) => a + sumLines(r.lines), 0)
-  if (paid <= 0) return false
-  const commission = computePersonCommission(month, person)
-  return commission === 0 || paid >= commission * 0.99
+// ── BAEKO cell (history table) ───────────────────────────────────
+function BaekoCell({ row }: { row: HistoryRow }) {
+  const pays    = row.payments.filter(p => p.recipient_type === 'baeko')
+  const paid    = payTotal(pays)
+  const baekoAmt = n2(row.baeko_amount)
+  if (paid <= 0) return <span className={`${styles.badge} ${styles.badgeUnpaid}`}>Unpaid</span>
+  const full = baekoAmt === 0 || paid >= baekoAmt * 0.99
+  return (
+    <div className={styles.payCellStack}>
+      <span className={`${styles.badge} ${full ? styles.badgePaid : styles.badgePartial}`}>
+        {full ? '✓' : '~'} {fmt(paid)}
+      </span>
+      <span className={styles.payCellSub}>{pays.length} pmt{pays.length !== 1 ? 's' : ''}</span>
+    </div>
+  )
 }
 
-function isBaekoPaid(month: string, baekoAmt: number, payments: PayRecord[]): boolean {
-  const paid = payments
-    .filter(p => p.month === month && p.target === 'baeko')
-    .reduce((a, r) => a + sumLines(r.lines), 0)
-  return paid > 0 && paid >= baekoAmt * 0.99
+// ── Sales person cell (history table) ───────────────────────────
+function SpCell({ row, name }: { row: HistoryRow; name: string }) {
+  const spc = (row.salesPersonCommissions ?? []).find(s => s.name === name)
+  if (!spc || spc.commission <= 0) {
+    return <span className={styles.muted}>—</span>
+  }
+  return (
+    <div className={styles.payCellStack}>
+      <span className={styles.spCommAmt}>{fmt(spc.commission)}</span>
+      <span className={`${styles.badge} ${spc.paid ? styles.badgePaid : styles.badgeUnpaid}`}>
+        {spc.paid ? '✓ Paid' : 'Unpaid'}
+      </span>
+    </div>
+  )
 }
 
-const SHIPMENT_MONTHS = Array.from(new Set(MOCK_SHIPMENTS.map(s => s.date.slice(0, 7)))).sort().reverse()
+// ── Is a history row fully settled? ─────────────────────────────
+function isRowFullyPaid(row: HistoryRow): boolean {
+  const baekoAmt = n2(row.baeko_amount)
+  if (baekoAmt > 0) {
+    const baekoPaid = payTotal(row.payments.filter(p => p.recipient_type === 'baeko'))
+    if (baekoPaid < baekoAmt * 0.99) return false
+  }
+  for (const spc of (row.salesPersonCommissions ?? [])) {
+    if (spc.commission > 0 && !spc.paid) return false
+  }
+  return true
+}
 
-// ── Pay Modal (3-step) ─────────────────────────────────────────
-function PayModal({ history, payments, onSave, onClose }: {
-  history: HistoryRow[]
-  payments: PayRecord[]
-  onSave: (r: PayRecord) => void
+// ── Sum numeric columns across history rows ──────────────────────
+function sumRows(rows: HistoryRow[]) {
+  return {
+    shipments:  rows.reduce((a, r) => a + n2(r.shipments), 0),
+    revenue:    rows.reduce((a, r) => a + n2(r.revenue), 0),
+    ups_cost:   rows.reduce((a, r) => a + n2(r.ups_cost), 0),
+    net_profit: rows.reduce((a, r) => a + n2(r.net_profit), 0),
+    baeko:      rows.reduce((a, r) => a + n2(r.baeko_amount), 0),
+    sales:      rows.reduce((a, r) => a + n2(r.sales_amount), 0),
+    overhead:   rows.reduce((a, r) => a + n2(r.overhead_amount), 0),
+  }
+}
+
+// ── Pay Modal ────────────────────────────────────────────────────
+function PayModal({
+  historyRows,
+  onFetchMonth,
+  onSave,
+  onClose,
+}: {
+  historyRows: HistoryRow[]
+  onFetchMonth: (month: string) => Promise<MonthData>
+  onSave: (payload: {
+    month: string
+    recipient_type: 'baeko' | 'sales_person'
+    sales_person?: string
+    amount: number
+    method: string
+    paid_date: string
+    memo?: string
+  }) => Promise<void>
   onClose: () => void
 }) {
-  const [step, setStep]           = useState<1 | 2 | 3>(1)
-  const [selMonth, setSelMonth]   = useState(HISTORY_MONTHS[0])
-  const [target, setTarget]       = useState<'baeko' | 'sales' | null>(null)
-  const [selPerson, setSelPerson] = useState('')
-  const [lines, setLines]         = useState<SplitLine[]>([newLine()])
+  const defaultMonth  = historyRows[0]?.month ?? thisMonthStr()
+  const [step,        setStep]        = useState<1 | 2 | 3>(1)
+  const [selMonth,    setSelMonth]    = useState(defaultMonth)
+  const [target,      setTarget]      = useState<'baeko' | 'sales_person' | null>(null)
+  const [selPerson,   setSelPerson]   = useState('')
+  const [lines,       setLines]       = useState<SplitLine[]>([newLine()])
+  const [modalData,   setModalData]   = useState<MonthData | null>(null)
+  const [dataLoading, setDataLoading] = useState(false)
+  const [saving,      setSaving]      = useState(false)
+  const [saveErr,     setSaveErr]     = useState('')
 
-  const histRow = history.find(r => r.month === selMonth)
+  const loadModalMonth = useCallback(async (m: string) => {
+    setDataLoading(true)
+    try { setModalData(await onFetchMonth(m)) } catch { /* ignore */ }
+    finally { setDataLoading(false) }
+  }, [onFetchMonth])
 
-  const personCommissions = useMemo(() => {
-    const map: Record<string, number> = {}
-    SALES_PERSONS.forEach(p => { map[p] = computePersonCommission(selMonth, p) })
-    return map
-  }, [selMonth])
+  useEffect(() => { loadModalMonth(selMonth) }, [selMonth, loadModalMonth])
 
-  // Availability for selected month
+  const histRow = historyRows.find(r => r.month === selMonth)
+
   const paidStatus = useMemo(() => {
-    const baekoDone = isBaekoPaid(selMonth, histRow?.baekoAmt ?? 0, payments)
-    const unpaidPersons = SALES_PERSONS.filter(p => !isPersonPaid(selMonth, p, payments))
-    const allDone = baekoDone && unpaidPersons.length === 0
-    return { baekoDone, unpaidPersons, allDone }
-  }, [selMonth, payments, histRow])
+    if (!modalData) return { baekoDone: false, unpaidPersons: [] as SalesPersonRow[], allDone: false }
+    const pays     = modalData.payments
+    const baekoAmt = n2(modalData.baeko_amount)
+    const baekoPaid = payTotal(pays.filter(p => p.recipient_type === 'baeko'))
+    const baekoDone = baekoAmt > 0 && baekoPaid >= baekoAmt * 0.99
+    const unpaidPersons = modalData.sales_persons.filter(sp => {
+      const spPaid = payTotal(pays.filter(p => p.sales_person === sp.sales_person))
+      const comm   = n2(sp.commission)
+      return comm <= 0 || spPaid < comm * 0.99
+    })
+    return { baekoDone, unpaidPersons, allDone: baekoDone && unpaidPersons.length === 0 }
+  }, [modalData])
 
   const showBaeko = !paidStatus.baekoDone
   const showSales = paidStatus.unpaidPersons.length > 0
 
-  const selectedCommission = selPerson ? (personCommissions[selPerson] ?? 0) : 0
-  const canNext2 = (target === 'baeko' && showBaeko) || (target === 'sales' && !!selPerson)
+  const selectedCommission = selPerson
+    ? n2(modalData?.sales_persons.find(sp => sp.sales_person === selPerson)?.commission)
+    : 0
+  const canNext2 = (target === 'baeko' && showBaeko) || (target === 'sales_person' && !!selPerson)
   const total    = sumLines(lines)
 
-  const handleMonthChange = (m: string) => {
-    setSelMonth(m)
-    setTarget(null)
-    setSelPerson('')
-  }
+  const handleMonthChange = (m: string) => { setSelMonth(m); setTarget(null); setSelPerson('') }
 
   const handleNext2 = () => {
     if (!canNext2) return
     let amt = ''
-    if (target === 'baeko' && histRow) amt = histRow.baekoAmt.toFixed(2)
-    else if (target === 'sales' && selectedCommission > 0) amt = selectedCommission.toFixed(2)
-    setLines([newLine(amt)])
-    setStep(3)
+    if      (target === 'baeko'        && histRow)              amt = n2(histRow.baeko_amount).toFixed(2)
+    else if (target === 'sales_person' && selectedCommission > 0) amt = selectedCommission.toFixed(2)
+    setLines([newLine(amt)]); setStep(3)
   }
 
   const updateLine = (id: string, patch: Partial<SplitLine>) =>
     setLines(p => p.map(l => l.id === id ? { ...l, ...patch } : l))
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!target) return
-    const validLines = lines.filter(l => parseFloat(l.amount) > 0)
-    if (!validLines.length) return
-    onSave({
-      id:          `PR${Date.now()}`,
-      month:       selMonth,
-      target,
-      salesPerson: target === 'sales' ? selPerson : '',
-      lines:       validLines,
-    })
+    const validLines = lines.filter(l => parseFloat(l.amount) > 0 && l.method && l.date)
+    if (!validLines.length) { setSaveErr('Please fill amount, method and date'); return }
+    setSaving(true); setSaveErr('')
+    try {
+      for (const line of validLines) {
+        await onSave({
+          month: selMonth, recipient_type: target,
+          sales_person: target === 'sales_person' ? selPerson : undefined,
+          amount: parseFloat(line.amount), method: line.method,
+          paid_date: line.date, memo: line.memo || undefined,
+        })
+      }
+      onClose()
+    } catch (err) { setSaveErr((err as Error).message) }
+    finally { setSaving(false) }
   }
 
   return (
     <div className={styles.overlay} onClick={onClose}>
       <div className={`${styles.modal} ${styles.modalWide}`} onClick={e => e.stopPropagation()}>
-
-        {/* Header */}
         <div className={styles.modalHeader}>
           <div>
             <div className={styles.modalTitle}>New Payment</div>
@@ -238,43 +304,49 @@ function PayModal({ history, payments, onSave, onClose }: {
         </div>
 
         <div className={styles.modalBody}>
-
-          {/* ── Step 1: Month ── */}
           {step === 1 && (
             <div className={styles.paySection}>
               <div className={styles.paySectionTitle}>Select Settlement Month</div>
               <div className={styles.formField}>
                 <label className={styles.fieldLabel}>Month</label>
-                <select className={styles.select} value={selMonth} onChange={e => handleMonthChange(e.target.value)}>
-                  {HISTORY_MONTHS.map(m => <option key={m} value={m}>{mLabel(m)}</option>)}
+                <select className={styles.select} value={selMonth}
+                  onChange={e => handleMonthChange(e.target.value)}>
+                  {historyRows.map(r => (
+                    <option key={r.month} value={r.month}>{mLabel(r.month)}</option>
+                  ))}
                 </select>
               </div>
-              {histRow && (
+              {dataLoading ? (
+                <div className={styles.muted} style={{ fontSize: 13 }}>Loading…</div>
+              ) : histRow && (
                 <div className={styles.monthSummary}>
                   <div className={styles.montSummaryItem}>
                     <span className={styles.montSummaryLabel}>Net Profit</span>
-                    <span className={styles.montSummaryVal}>{fmt(histRow.netProfit)}</span>
+                    <span className={styles.montSummaryVal}>{fmt(n2(histRow.net_profit))}</span>
                   </div>
                   <div className={styles.montSummaryItem}>
                     <span className={styles.montSummaryLabel}>BAEKO (30%)</span>
-                    <span className={styles.montSummaryVal} style={{ color: '#FD4C1D' }}>{fmt(histRow.baekoAmt)}</span>
+                    <span className={styles.montSummaryVal} style={{ color: '#FD4C1D' }}>
+                      {fmt(n2(histRow.baeko_amount))}
+                    </span>
                   </div>
                   <div className={styles.montSummaryItem}>
                     <span className={styles.montSummaryLabel}>Sales Pool (10%)</span>
-                    <span className={styles.montSummaryVal} style={{ color: '#F59E0B' }}>{fmt(histRow.salesAmt)}</span>
+                    <span className={styles.montSummaryVal} style={{ color: '#F59E0B' }}>
+                      {fmt(n2(histRow.sales_amount))}
+                    </span>
                   </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* ── Step 2: Target ── */}
           {step === 2 && (
             <div className={styles.paySection}>
               <div className={styles.paySectionTitle}>Who are you paying? — {mLabel(selMonth)}</div>
-
-              {/* All done */}
-              {paidStatus.allDone ? (
+              {dataLoading ? (
+                <div className={styles.muted} style={{ fontSize: 13 }}>Loading…</div>
+              ) : paidStatus.allDone ? (
                 <div className={styles.allDoneBox}>
                   <span className={styles.allDoneIcon}>✓</span>
                   <div>
@@ -285,7 +357,6 @@ function PayModal({ history, payments, onSave, onClose }: {
               ) : (
                 <>
                   <div className={styles.targetOptions}>
-                    {/* BAEKO option */}
                     {showBaeko && (
                       <label className={`${styles.targetOpt} ${target === 'baeko' ? styles.targetOptOn : ''}`}>
                         <input type="radio" name="target" value="baeko" checked={target === 'baeko'}
@@ -295,49 +366,43 @@ function PayModal({ history, payments, onSave, onClose }: {
                             <span className={styles.payDot} style={{ background: '#FD4C1D' }} />
                             BAEKO (30%)
                           </div>
-                          <div className={styles.targetOptAmt}>{histRow ? fmt(histRow.baekoAmt) : '—'}</div>
+                          <div className={styles.targetOptAmt}>{histRow ? fmt(n2(histRow.baeko_amount)) : '—'}</div>
                         </div>
                       </label>
                     )}
-
-                    {/* Sales Person option */}
                     {showSales && (
-                      <label className={`${styles.targetOpt} ${target === 'sales' ? styles.targetOptOn : ''}`}>
-                        <input type="radio" name="target" value="sales" checked={target === 'sales'}
-                          onChange={() => setTarget('sales')} />
+                      <label className={`${styles.targetOpt} ${target === 'sales_person' ? styles.targetOptOn : ''}`}>
+                        <input type="radio" name="target" value="sales_person"
+                          checked={target === 'sales_person'} onChange={() => setTarget('sales_person')} />
                         <div className={styles.targetOptBody}>
                           <div className={styles.targetOptName}>
                             <span className={styles.payDot} style={{ background: '#F59E0B' }} />
                             Sales Person (10%)
                           </div>
                           <div className={styles.targetOptAmt}>
-                            {histRow ? `Pool: ${fmt(histRow.salesAmt)}` : '—'}
+                            {histRow ? `Pool: ${fmt(n2(histRow.sales_amount))}` : '—'}
                           </div>
                         </div>
                       </label>
                     )}
                   </div>
-
-                  {target === 'sales' && (
+                  {target === 'sales_person' && (
                     <div className={styles.formField} style={{ marginTop: 16 }}>
                       <label className={styles.fieldLabel}>Sales Person</label>
                       <select className={styles.select} value={selPerson}
                         onChange={e => setSelPerson(e.target.value)}>
                         <option value="">Select person…</option>
-                        {paidStatus.unpaidPersons.map(p => {
-                          const c = personCommissions[p]
-                          return (
-                            <option key={p} value={p}>
-                              {p}{c > 0 ? ` — ${fmt(c)}` : ''}
-                            </option>
-                          )
-                        })}
+                        {paidStatus.unpaidPersons.map(sp => (
+                          <option key={sp.sales_person_id} value={sp.sales_person}>
+                            {sp.sales_person}{n2(sp.commission) > 0 ? ` — ${fmt(n2(sp.commission))}` : ''}
+                          </option>
+                        ))}
                       </select>
                       {selPerson && (
                         <div className={styles.commissionHint}>
                           {selectedCommission > 0
                             ? <>Commission: <strong>{fmt(selectedCommission)}</strong></>
-                            : <span style={{ color: 'var(--muted)' }}>No shipment data — enter amount manually</span>}
+                            : <span style={{ color: 'var(--muted)' }}>No commission data — enter amount manually</span>}
                         </div>
                       )}
                     </div>
@@ -347,18 +412,18 @@ function PayModal({ history, payments, onSave, onClose }: {
             </div>
           )}
 
-          {/* ── Step 3: Amount & Method ── */}
           {step === 3 && (
             <div className={styles.paySection}>
               <div className={styles.paySectionTitle}>
                 {target === 'baeko' ? 'BAEKO Payment' : `${selPerson} — Commission`}
                 {histRow && (
                   <span className={styles.paySectionRef}>
-                    ref: {target === 'baeko' ? fmt(histRow.baekoAmt) : selectedCommission > 0 ? fmt(selectedCommission) : 'manual'}
+                    ref: {target === 'baeko'
+                      ? fmt(n2(histRow.baeko_amount))
+                      : selectedCommission > 0 ? fmt(selectedCommission) : 'manual'}
                   </span>
                 )}
               </div>
-
               <div className={styles.splitList}>
                 {lines.map((line, idx) => (
                   <div key={line.id} className={styles.splitLine}>
@@ -401,20 +466,17 @@ function PayModal({ history, payments, onSave, onClose }: {
                   </div>
                 ))}
               </div>
-
               <div className={styles.splitFooter}>
-                <button className={styles.addSplitBtn}
-                  onClick={() => setLines(p => [...p, newLine()])}>
+                <button className={styles.addSplitBtn} onClick={() => setLines(p => [...p, newLine()])}>
                   + Add Split
                 </button>
                 <div className={styles.splitTotal}>Total: <strong>{fmt(total)}</strong></div>
               </div>
+              {saveErr && <div style={{ color: '#DC2626', fontSize: 13 }}>{saveErr}</div>}
             </div>
           )}
-
         </div>
 
-        {/* Footer nav */}
         <div className={styles.modalFooter}>
           {step === 1 && <>
             <button className={styles.btnCancel} onClick={onClose}>Cancel</button>
@@ -422,13 +484,15 @@ function PayModal({ history, payments, onSave, onClose }: {
           </>}
           {step === 2 && <>
             <button className={styles.btnCancel} onClick={() => setStep(1)}>← Back</button>
-            {!paidStatus.allDone && (
+            {!paidStatus.allDone && !dataLoading && (
               <button className={styles.btnSave} disabled={!canNext2} onClick={handleNext2}>Next →</button>
             )}
           </>}
           {step === 3 && <>
             <button className={styles.btnCancel} onClick={() => setStep(2)}>← Back</button>
-            <button className={styles.btnSave} disabled={total === 0} onClick={handleSave}>Save</button>
+            <button className={styles.btnSave} disabled={total === 0 || saving} onClick={handleSave}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
           </>}
         </div>
       </div>
@@ -436,39 +500,57 @@ function PayModal({ history, payments, onSave, onClose }: {
   )
 }
 
-// ── Detail Modal (row click) — with edit & delete ──────────────
-function DetailModal({ row, payments, onUpdate, onDelete, onClose }: {
+// ── Detail Modal ─────────────────────────────────────────────────
+function DetailModal({
+  row,
+  onReload,
+  onClose,
+}: {
   row: HistoryRow
-  payments: PayRecord[]
-  onUpdate: (record: PayRecord) => void
-  onDelete: (id: string) => void
+  onReload: () => void
   onClose: () => void
 }) {
-  const [editingId, setEditingId]       = useState<string | null>(null)
-  const [editDraft, setEditDraft]       = useState<PayRecord | null>(null)
+  const [editingId,       setEditingId]       = useState<string | null>(null)
+  const [editDraft,       setEditDraft]       = useState<ApiPayment | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [saving,          setSaving]          = useState(false)
 
-  const records = payments.filter(p => p.month === row.month)
-
-  const startEdit = (rec: PayRecord) => {
-    setConfirmDeleteId(null)
-    setEditingId(rec.id)
-    setEditDraft(JSON.parse(JSON.stringify(rec)))
-  }
-
+  const payments = row.payments
+  const startEdit = (p: ApiPayment) => { setConfirmDeleteId(null); setEditingId(p.id); setEditDraft({ ...p }) }
   const cancelEdit = () => { setEditingId(null); setEditDraft(null) }
 
-  const saveEdit = () => {
-    if (editDraft) { onUpdate(editDraft); setEditingId(null); setEditDraft(null) }
+  const saveEdit = async () => {
+    if (!editDraft) return
+    setSaving(true)
+    try {
+      await fetch(`${API_URL}/api/settlements/payments/${editDraft.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipient_type: editDraft.recipient_type,
+          sales_person: editDraft.sales_person,
+          amount: Number(editDraft.amount),
+          method: editDraft.method,
+          paid_date: editDraft.paid_date,
+          memo: editDraft.memo,
+        }),
+      })
+      setEditingId(null); setEditDraft(null); onReload()
+    } catch { /* ignore */ }
+    finally { setSaving(false) }
   }
 
-  const updateDraftLine = (lineId: string, patch: Partial<SplitLine>) => {
-    setEditDraft(prev => prev
-      ? { ...prev, lines: prev.lines.map(l => l.id === lineId ? { ...l, ...patch } : l) }
-      : null)
+  const handleDelete = async (id: string) => {
+    setSaving(true)
+    try {
+      await fetch(`${API_URL}/api/settlements/payments/${id}`, { method: 'DELETE' })
+      setConfirmDeleteId(null); onReload()
+    } catch { /* ignore */ }
+    finally { setSaving(false) }
   }
 
-  const handleDelete = (id: string) => { onDelete(id); setConfirmDeleteId(null) }
+  const updateDraft = (patch: Partial<ApiPayment>) =>
+    setEditDraft(prev => prev ? { ...prev, ...patch } : null)
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -477,104 +559,94 @@ function DetailModal({ row, payments, onUpdate, onDelete, onClose }: {
           <div className={styles.modalTitle}>Payment Records — {mLabel(row.month)}</div>
           <button className={styles.modalClose} onClick={onClose}>✕</button>
         </div>
-
         <div className={styles.modalBody}>
-          {records.length === 0 ? (
+          {payments.length === 0 ? (
             <div className={styles.empty}>No payment records for this month.</div>
-          ) : (
-            records.map(rec => {
-              const isEditing = editingId === rec.id
-              const draft     = isEditing ? editDraft! : rec
-              const isConfirmDelete = confirmDeleteId === rec.id
-
-              return (
-                <div key={rec.id} className={`${styles.detailRecord} ${isEditing ? styles.detailRecordEditing : ''}`}>
-
-                  {/* Record header */}
-                  <div className={styles.detailRecordHead}>
-                    <span className={styles.payDot}
-                      style={{ background: rec.target === 'baeko' ? '#FD4C1D' : '#F59E0B' }} />
-                    <span className={styles.detailRecordTarget}>
-                      {rec.target === 'baeko' ? 'BAEKO (30%)' : `${rec.salesPerson} — Sales`}
-                    </span>
-                    <span className={styles.detailRecordTot}>{fmt(sumLines(rec.lines))}</span>
-
-                    {/* Action buttons — hidden while editing */}
-                    {!isEditing && !isConfirmDelete && (
-                      <div className={styles.detailRecordActions}>
-                        <button className={styles.editRecBtn} onClick={() => startEdit(rec)}>Edit</button>
-                        <button className={styles.deleteRecBtn} onClick={() => setConfirmDeleteId(rec.id)}>Delete</button>
-                      </div>
-                    )}
-
-                    {/* Confirm delete */}
-                    {isConfirmDelete && (
-                      <div className={styles.confirmDelete}>
-                        <span className={styles.confirmDeleteMsg}>Delete this record?</span>
-                        <button className={styles.confirmYesBtn} onClick={() => handleDelete(rec.id)}>Yes, Delete</button>
-                        <button className={styles.confirmNoBtn} onClick={() => setConfirmDeleteId(null)}>Cancel</button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Lines — view or edit */}
-                  <div className={styles.detailLines}>
-                    {draft.lines.map((l, i) => (
-                      isEditing ? (
-                        /* Edit form */
-                        <div key={l.id} className={styles.editLineGrid}>
-                          <div className={styles.editLineNum}>#{i + 1}</div>
-                          <div className={styles.formField}>
-                            <label className={styles.fieldLabel}>Amount</label>
-                            <input type="number" min="0" step="0.01" className={styles.input}
-                              value={l.amount}
-                              onChange={e => updateDraftLine(l.id, { amount: e.target.value })} />
-                          </div>
-                          <div className={styles.formField}>
-                            <label className={styles.fieldLabel}>Method</label>
-                            <select className={styles.select} value={l.method}
-                              onChange={e => updateDraftLine(l.id, { method: e.target.value as PaymentMethod })}>
-                              <option value="">Select…</option>
-                              {ALL_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-                            </select>
-                          </div>
-                          <div className={styles.formField}>
-                            <label className={styles.fieldLabel}>Date</label>
-                            <input type="date" className={styles.input} value={l.date}
-                              onChange={e => updateDraftLine(l.id, { date: e.target.value })} />
-                          </div>
-                          <div className={`${styles.formField} ${styles.editLineMemo}`}>
-                            <label className={styles.fieldLabel}>Memo</label>
-                            <input type="text" className={styles.input} value={l.memo}
-                              onChange={e => updateDraftLine(l.id, { memo: e.target.value })} />
-                          </div>
-                        </div>
-                      ) : (
-                        /* View mode */
-                        <div key={l.id} className={styles.detailLine}>
-                          <span className={styles.detailLineIdx}>#{i + 1}</span>
-                          <span className={styles.detailLineAmt}>{fmt(parseFloat(l.amount) || 0)}</span>
-                          <span className={`${styles.badge} ${styles.badgeMethod}`}>{l.method || '—'}</span>
-                          <span className={styles.detailLineDate}>{l.date || '—'}</span>
-                          {l.memo && <span className={styles.detailLineMemo}>{l.memo}</span>}
-                        </div>
-                      )
-                    ))}
-                  </div>
-
-                  {/* Edit save/cancel */}
-                  {isEditing && (
-                    <div className={styles.editActions}>
-                      <button className={styles.btnCancel} onClick={cancelEdit}>Cancel</button>
-                      <button className={styles.btnSave} onClick={saveEdit}>Save Changes</button>
+          ) : payments.map(pay => {
+            const isEditing = editingId === pay.id
+            const draft     = isEditing && editDraft ? editDraft : pay
+            const isConfirm = confirmDeleteId === pay.id
+            return (
+              <div key={pay.id}
+                className={`${styles.detailRecord} ${isEditing ? styles.detailRecordEditing : ''}`}>
+                <div className={styles.detailRecordHead}>
+                  <span className={styles.payDot}
+                    style={{ background: pay.recipient_type === 'baeko' ? '#FD4C1D' : '#F59E0B' }} />
+                  <span className={styles.detailRecordTarget}>
+                    {pay.recipient_type === 'baeko' ? 'BAEKO (30%)' : `${pay.sales_person ?? '?'} — Sales`}
+                  </span>
+                  <span className={styles.detailRecordTot}>{fmt(n2(pay.amount))}</span>
+                  {!isEditing && !isConfirm && (
+                    <div className={styles.detailRecordActions}>
+                      <button className={styles.editRecBtn} onClick={() => startEdit(pay)}>Edit</button>
+                      <button className={styles.deleteRecBtn}
+                        onClick={() => setConfirmDeleteId(pay.id)}>Delete</button>
+                    </div>
+                  )}
+                  {isConfirm && (
+                    <div className={styles.confirmDelete}>
+                      <span className={styles.confirmDeleteMsg}>Delete this record?</span>
+                      <button className={styles.confirmYesBtn} disabled={saving}
+                        onClick={() => handleDelete(pay.id)}>Yes, Delete</button>
+                      <button className={styles.confirmNoBtn}
+                        onClick={() => setConfirmDeleteId(null)}>Cancel</button>
                     </div>
                   )}
                 </div>
-              )
-            })
-          )}
+                <div className={styles.detailLines}>
+                  {isEditing ? (
+                    <div className={styles.editLineGrid}>
+                      <div className={styles.editLineNum}>#1</div>
+                      <div className={styles.formField}>
+                        <label className={styles.fieldLabel}>Amount</label>
+                        <input type="number" min="0" step="0.01" className={styles.input}
+                          value={String(draft.amount)}
+                          onChange={e => updateDraft({ amount: e.target.value })} />
+                      </div>
+                      <div className={styles.formField}>
+                        <label className={styles.fieldLabel}>Method</label>
+                        <select className={styles.select} value={draft.method}
+                          onChange={e => updateDraft({ method: e.target.value })}>
+                          {ALL_METHODS.filter(Boolean).map(m => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className={styles.formField}>
+                        <label className={styles.fieldLabel}>Date</label>
+                        <input type="date" className={styles.input}
+                          value={draft.paid_date?.slice(0, 10) ?? ''}
+                          onChange={e => updateDraft({ paid_date: e.target.value })} />
+                      </div>
+                      <div className={`${styles.formField} ${styles.editLineMemo}`}>
+                        <label className={styles.fieldLabel}>Memo</label>
+                        <input type="text" className={styles.input}
+                          value={draft.memo ?? ''}
+                          onChange={e => updateDraft({ memo: e.target.value })} />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={styles.detailLine}>
+                      <span className={styles.detailLineIdx}>#1</span>
+                      <span className={styles.detailLineAmt}>{fmt(n2(pay.amount))}</span>
+                      <span className={`${styles.badge} ${styles.badgeMethod}`}>{pay.method || '—'}</span>
+                      <span className={styles.detailLineDate}>{pay.paid_date?.slice(0, 10) ?? '—'}</span>
+                      {pay.memo && <span className={styles.detailLineMemo}>{pay.memo}</span>}
+                    </div>
+                  )}
+                </div>
+                {isEditing && (
+                  <div className={styles.editActions}>
+                    <button className={styles.btnCancel} onClick={cancelEdit}>Cancel</button>
+                    <button className={styles.btnSave} disabled={saving} onClick={saveEdit}>
+                      {saving ? 'Saving…' : 'Save Changes'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
-
         <div className={styles.modalFooter}>
           <button className={styles.btnSave} onClick={onClose}>Close</button>
         </div>
@@ -583,73 +655,176 @@ function DetailModal({ row, payments, onUpdate, onDelete, onClose }: {
   )
 }
 
-// ── History cell helpers ───────────────────────────────────────
-function BaekoCell({ row, payments }: { row: HistoryRow; payments: PayRecord[] }) {
-  const recs  = payments.filter(p => p.month === row.month && p.target === 'baeko')
-  const paid  = recs.reduce((a, r) => a + sumLines(r.lines), 0)
-  const count = recs.length
-  if (paid === 0) return <span className={`${styles.badge} ${styles.badgeUnpaid}`}>Unpaid</span>
-  const full  = paid >= row.baekoAmt * 0.99
-  return (
-    <div className={styles.payCellStack}>
-      <span className={`${styles.badge} ${full ? styles.badgePaid : styles.badgePartial}`}>
-        {full ? '✓' : '~'} {fmt(paid)}
-      </span>
-      <span className={styles.payCellSub}>{count} payment{count > 1 ? 's' : ''}</span>
-    </div>
-  )
-}
-
-function SalesCell({ row, payments }: { row: HistoryRow; payments: PayRecord[] }) {
-  const recs = payments.filter(p => p.month === row.month && p.target === 'sales')
-  if (recs.length === 0) return <span className={`${styles.badge} ${styles.badgeUnpaid}`}>Unpaid</span>
-  const byPerson: Record<string, number> = {}
-  recs.forEach(r => { byPerson[r.salesPerson] = (byPerson[r.salesPerson] ?? 0) + sumLines(r.lines) })
-  return (
-    <div className={styles.salesCellStack}>
-      {Object.entries(byPerson).map(([person, amt]) => (
-        <div key={person} className={styles.salesCellRow}>
-          <span className={`${styles.badge} ${styles.badgePaid}`}>✓ {person.split(' ')[0]}</span>
-          <span className={styles.salesCellAmt}>{fmt(amt)}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ── Page ──────────────────────────────────────────────────────
+// ── Page ─────────────────────────────────────────────────────────
 export default function SettlementPage() {
-  const [month, setMonth]               = useState(SHIPMENT_MONTHS[0])
-  const [history]                       = useState<HistoryRow[]>(INIT_HISTORY)
-  const [payments, setPayments]         = useState<PayRecord[]>(INIT_PAYMENTS)
-  const [showPayModal, setShowPayModal] = useState(false)
-  const [detailRow, setDetailRow]       = useState<HistoryRow | null>(null)
+  // ── Core state ────────────────────────────────────────────────
+  const [historyRows,   setHistoryRows]   = useState<HistoryRow[]>([])
+  const [monthData,     setMonthData]     = useState<MonthData | null>(null)
+  const [selectedMonth, setSelectedMonth] = useState(thisMonthStr())
+  const [histLoading,   setHistLoading]   = useState(true)
+  const [monthLoading,  setMonthLoading]  = useState(true)
+  const [showPayModal,  setShowPayModal]  = useState(false)
+  const [detailRow,     setDetailRow]     = useState<HistoryRow | null>(null)
 
-  const filtered = useMemo(
-    () => MOCK_SHIPMENTS.filter(s => s.date.startsWith(month)),
-    [month],
+  // ── Payment summary state ─────────────────────────────────────
+  const [summaryData,     setSummaryData]     = useState<SummaryData | null>(null)
+  const [showPaidHistory, setShowPaidHistory] = useState(false)
+
+  // ── View mode + custom range state ───────────────────────────
+  const [viewMode,     setViewMode]     = useState<'monthly' | 'custom'>('monthly')
+  const [rangeFrom,    setRangeFrom]    = useState(firstDayOfMonth())
+  const [rangeTo,      setRangeTo]      = useState(todayStr())
+  const [rangeData,    setRangeData]    = useState<RangeData | null>(null)
+  const [rangeLoading, setRangeLoading] = useState(false)
+
+  // ── Load summary ─────────────────────────────────────────────
+  const loadSummary = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/settlements/summary`)
+      setSummaryData((await res.json()) as SummaryData)
+    } catch { /* ignore */ }
+  }, [])
+
+  // ── Load history ──────────────────────────────────────────────
+  const loadHistory = useCallback(async () => {
+    setHistLoading(true)
+    try {
+      const res  = await fetch(`${API_URL}/api/settlements/history`)
+      const data = (await res.json()) as HistoryRow[]
+      setHistoryRows(data)
+      const visible = data.filter(r => r.month >= HISTORY_START)
+      const cur = visible.find(r => r.month === thisMonthStr())
+      if (cur) setSelectedMonth(cur.month)
+      else if (visible.length > 0) setSelectedMonth(visible[0].month)
+    } catch { /* ignore */ }
+    finally { setHistLoading(false) }
+  }, [])
+
+  // ── Load single month data ────────────────────────────────────
+  const loadMonthData = useCallback(async (monthStr: string) => {
+    setMonthLoading(true)
+    try {
+      const [y, m] = monthStr.split('-')
+      const res  = await fetch(`${API_URL}/api/settlements/month?year=${y}&month=${parseInt(m)}`)
+      setMonthData((await res.json()) as MonthData)
+    } catch { /* ignore */ }
+    finally { setMonthLoading(false) }
+  }, [])
+
+  const fetchMonth = useCallback(async (monthStr: string): Promise<MonthData> => {
+    const [y, m] = monthStr.split('-')
+    const res = await fetch(`${API_URL}/api/settlements/month?year=${y}&month=${parseInt(m)}`)
+    return (await res.json()) as MonthData
+  }, [])
+
+  // ── Load range data ───────────────────────────────────────────
+  const loadRangeData = useCallback(async (from: string, to: string) => {
+    if (!from || !to) return
+    setRangeLoading(true)
+    try {
+      const res = await fetch(
+        `${API_URL}/api/settlements/range?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+      )
+      setRangeData((await res.json()) as RangeData)
+    } catch { /* ignore */ }
+    finally { setRangeLoading(false) }
+  }, [])
+
+  useEffect(() => { loadHistory() }, [loadHistory])
+  useEffect(() => { loadSummary() }, [loadSummary])
+  useEffect(() => { if (selectedMonth) loadMonthData(selectedMonth) }, [selectedMonth, loadMonthData])
+
+  // ── Post a payment ────────────────────────────────────────────
+  const handleSavePayment = useCallback(async (payload: {
+    month: string; recipient_type: 'baeko' | 'sales_person'
+    sales_person?: string; amount: number; method: string; paid_date: string; memo?: string
+  }) => {
+    const res = await fetch(`${API_URL}/api/settlements/payments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as { error?: string }
+      throw new Error(err.error ?? `HTTP ${res.status}`)
+    }
+    await Promise.all([loadHistory(), loadMonthData(payload.month), loadSummary()])
+  }, [loadHistory, loadMonthData, loadSummary])
+
+  // ── Reload after detail edit/delete ──────────────────────────
+  const handleDetailReload = useCallback(async () => {
+    if (!detailRow) return
+    const updated = await fetchMonth(detailRow.month)
+    setHistoryRows(prev => prev.map(r =>
+      r.month === detailRow.month
+        ? { ...r, settlement_id: updated.settlement_id, payments: updated.payments }
+        : r
+    ))
+    setDetailRow(prev => prev
+      ? { ...prev, settlement_id: updated.settlement_id, payments: updated.payments }
+      : null
+    )
+    if (selectedMonth === detailRow.month) setMonthData(updated)
+  }, [detailRow, fetchMonth, selectedMonth])
+
+  // ── Filtered history (2024-12 onwards) ───────────────────────
+  const filteredHistory = useMemo(
+    () => historyRows.filter(r => r.month >= HISTORY_START),
+    [historyRows]
   )
+
+  // ── Split history into unpaid / fully-paid ───────────────────
+  const { unpaidRows, paidRows } = useMemo(() => ({
+    unpaidRows: filteredHistory.filter(r => !isRowFullyPaid(r)),
+    paidRows:   filteredHistory.filter(r =>  isRowFullyPaid(r)),
+  }), [filteredHistory])
+
+  // ── Active sales persons across filtered history ──────────────
+  const activeSalesPersons = useMemo(() => {
+    const names = new Set<string>()
+    filteredHistory.forEach(row => {
+      (row.salesPersonCommissions ?? []).forEach(spc => names.add(spc.name))
+    })
+    return Array.from(names).sort()
+  }, [filteredHistory])
+
+  // ── Active display data (monthly or range) ───────────────────
+  const activeData: DisplayData | null = useMemo(() => {
+    if (viewMode === 'custom') return rangeData ?? null
+    return monthData ?? null
+  }, [viewMode, monthData, rangeData])
+
+  const activeLoading = viewMode === 'custom' ? rangeLoading : monthLoading
 
   const totals = useMemo(() => {
-    const revenue = filtered.reduce((a, s) => a + s.customerCharge, 0)
-    const cost    = filtered.reduce((a, s) => a + s.upsCost, 0)
-    const profit  = revenue - cost
-    return { revenue, cost, profit, baeko: profit * 0.30, sales: profit * 0.10, overhead: profit * 0.60 }
-  }, [filtered])
+    if (!activeData) return { revenue: 0, cost: 0, profit: 0, baeko: 0, sales: 0, overhead: 0 }
+    const revenue = n2(activeData.revenue)
+    const cost    = n2(activeData.ups_cost)
+    const profit  = n2(activeData.net_profit)
+    return { revenue, cost, profit,
+      baeko:    n2(activeData.baeko_amount),
+      sales:    n2(activeData.sales_amount),
+      overhead: n2(activeData.overhead_amount),
+    }
+  }, [activeData])
 
-  const byPerson = useMemo(() => {
-    const map: Record<string, { revenue: number; cost: number; count: number }> = {}
-    filtered.forEach(s => {
-      if (!map[s.salesPerson]) map[s.salesPerson] = { revenue: 0, cost: 0, count: 0 }
-      map[s.salesPerson].revenue += s.customerCharge
-      map[s.salesPerson].cost    += s.upsCost
-      map[s.salesPerson].count   += 1
-    })
-    return Object.entries(map)
-      .map(([name, d]) => ({ name, revenue: d.revenue, cost: d.cost,
-        profit: d.revenue - d.cost, commission: (d.revenue - d.cost) * 0.10, count: d.count }))
-      .sort((a, b) => b.commission - a.commission)
-  }, [filtered])
+  const displaySalesPersons = activeData?.sales_persons ?? []
+  const displayShipments    = activeData?.shipments ?? 0
+
+  // Paid amounts for the current period (monthly mode only — payments live on monthData)
+  const currentPeriodPaid = useMemo(() => {
+    if (viewMode !== 'monthly' || !monthData) return null
+    const pays = monthData.payments
+    const baeko = payTotal(pays.filter(p => p.recipient_type === 'baeko'))
+    const byPerson: Record<string, number> = {}
+    for (const p of pays) {
+      if (p.recipient_type === 'sales_person' && p.sales_person) {
+        byPerson[p.sales_person] = (byPerson[p.sales_person] ?? 0) + n2(p.amount)
+      }
+    }
+    const salesTotal = Object.values(byPerson).reduce((a, v) => a + v, 0)
+    return { baeko, byPerson, salesTotal }
+  }, [viewMode, monthData])
 
   const DIST = [
     { label: 'BAEKO (30%)',    pctVal: 30, value: totals.baeko,    color: '#FD4C1D' },
@@ -657,64 +832,301 @@ export default function SettlementPage() {
     { label: 'Overhead (60%)', pctVal: 60, value: totals.overhead, color: '#10B981' },
   ]
 
-  const handleUpdatePayment = (updated: PayRecord) =>
-    setPayments(prev => prev.map(p => p.id === updated.id ? updated : p))
+  const spin = (v: string | number | undefined) =>
+    activeLoading ? '…' : fmt(n2(v))
 
-  const handleDeletePayment = (id: string) =>
-    setPayments(prev => prev.filter(p => p.id !== id))
+  // ── Excel export ──────────────────────────────────────────────
+  const handleExportExcel = useCallback(() => {
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+    const data = filteredHistory.map(row => {
+      const baekoPays   = row.payments.filter(p => p.recipient_type === 'baeko')
+      const baekoPaid   = payTotal(baekoPays)
+      const baekoAmt    = n2(row.baeko_amount)
+      const baekoStatus = baekoPaid <= 0 ? 'Unpaid'
+        : (baekoAmt === 0 || baekoPaid >= baekoAmt * 0.99) ? 'Paid' : 'Partial'
+
+      const base: Record<string, string | number> = {
+        'Month':          row.month,
+        'Shipments':      n2(row.shipments),
+        'Revenue':        n2(row.revenue),
+        'UPS Cost':       n2(row.ups_cost),
+        'Net Profit':     n2(row.net_profit),
+        'BAEKO (30%)':    n2(row.baeko_amount),
+        'Sales (10%)':    n2(row.sales_amount),
+        'Overhead (60%)': n2(row.overhead_amount),
+        'BAEKO Payment':  baekoStatus,
+      }
+
+      // Dynamic SP columns
+      activeSalesPersons.forEach(name => {
+        const spc = (row.salesPersonCommissions ?? []).find(s => s.name === name)
+        base[`${name} Commission`] = spc ? spc.commission : 0
+        base[`${name} Paid`]       = spc ? (spc.paid ? 'Paid' : 'Unpaid') : 'N/A'
+      })
+
+      return base
+    })
+    const ws = XLSX.utils.json_to_sheet(data)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Settlement')
+    XLSX.writeFile(wb, `EZHEYO_Settlement_${today}.xlsx`)
+  }, [filteredHistory, activeSalesPersons])
+
+  // colSpan for history table = fixed cols + (2 per SP)
+  const histColSpan = 9 + activeSalesPersons.length
 
   return (
     <div className={styles.page}>
 
-      {/* ── Header ─────────────────────────────────────────── */}
+      {/* ── Header ─────────────────────────────────────────────── */}
       <div className={styles.header}>
         <div>
           <div className={styles.title}>Settlement</div>
-          <div className={styles.subtitle}>Monthly profit & commission breakdown</div>
+          <div className={styles.subtitle}>Monthly profit &amp; commission breakdown</div>
         </div>
-        <div className={styles.headerActions}>
-          <select className={styles.monthSelect} value={month} onChange={e => setMonth(e.target.value)}>
-            {SHIPMENT_MONTHS.map(m => <option key={m} value={m}>{mLabel(m)}</option>)}
-          </select>
-          <button className={styles.btnPay} onClick={() => setShowPayModal(true)}>+ Pay</button>
-        </div>
+        <button className={styles.btnPay} onClick={() => setShowPayModal(true)}
+          disabled={histLoading || filteredHistory.length === 0}>
+          + Pay
+        </button>
       </div>
 
-      {/* ── Summary cards ──────────────────────────────────── */}
-      <div className={styles.cards}>
+      {/* ── Filter bar ─────────────────────────────────────────── */}
+      <div className={styles.filterBar}>
+        {/* View mode toggle */}
+        <div className={styles.viewToggle}>
+          <button
+            className={`${styles.toggleBtn} ${viewMode === 'monthly' ? styles.toggleBtnActive : ''}`}
+            onClick={() => setViewMode('monthly')}>
+            Monthly
+          </button>
+          <button
+            className={`${styles.toggleBtn} ${viewMode === 'custom' ? styles.toggleBtnActive : ''}`}
+            onClick={() => setViewMode('custom')}>
+            Custom Range
+          </button>
+        </div>
+
+        {/* Monthly: month selector */}
+        {viewMode === 'monthly' && (
+          <select className={styles.monthSelect} value={selectedMonth}
+            disabled={histLoading}
+            onChange={e => setSelectedMonth(e.target.value)}>
+            {histLoading
+              ? <option>Loading…</option>
+              : filteredHistory.map(r => (
+                  <option key={r.month} value={r.month}>{mLabel(r.month)}</option>
+                ))
+            }
+          </select>
+        )}
+
+        {/* Custom Range: from / to / query button */}
+        {viewMode === 'custom' && (
+          <div className={styles.rangeControls}>
+            <label className={styles.rangeLabel}>From</label>
+            <input type="date" className={styles.rangeInput}
+              value={rangeFrom} onChange={e => setRangeFrom(e.target.value)} />
+            <label className={styles.rangeLabel}>To</label>
+            <input type="date" className={styles.rangeInput}
+              value={rangeTo} onChange={e => setRangeTo(e.target.value)} />
+            <button className={styles.queryBtn}
+              disabled={!rangeFrom || !rangeTo || rangeLoading}
+              onClick={() => loadRangeData(rangeFrom, rangeTo)}>
+              {rangeLoading ? 'Loading…' : '조회'}
+            </button>
+            {rangeData && !rangeLoading && (
+              <span className={styles.rangeNote}>
+                {rangeData.from} ~ {rangeData.to}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Row 1: Business summary ──────────────────────────────── */}
+      <div className={styles.statsRow1}>
         <div className={styles.card}>
-          <div className={styles.cardLabel}>Customer Revenue</div>
-          <div className={styles.cardValue}>{fmt(totals.revenue)}</div>
-          <div className={styles.cardSub}>{filtered.length} shipments</div>
+          <div className={styles.cardLabel}>Revenue</div>
+          <div className={styles.cardValue}>{spin(activeData?.revenue)}</div>
+          <div className={styles.cardSub}>
+            {activeLoading ? '…' : `${displayShipments.toLocaleString()} shipments`}
+          </div>
         </div>
         <div className={styles.card}>
           <div className={styles.cardLabel}>UPS Cost</div>
-          <div className={`${styles.cardValue} ${styles.negative}`}>{fmt(totals.cost)}</div>
-          <div className={styles.cardSub} style={{ color: '#EF4444' }}>{pct(totals.cost, totals.revenue)} of revenue</div>
+          <div className={`${styles.cardValue} ${styles.negative}`}>{spin(activeData?.ups_cost)}</div>
+          <div className={styles.cardSub} style={{ color: '#EF4444' }}>
+            {activeLoading ? '…' : pct(totals.cost, totals.revenue)} of revenue
+          </div>
         </div>
         <div className={`${styles.card} ${styles.cardProfit}`}>
           <div className={styles.cardLabel}>Net Profit</div>
-          <div className={`${styles.cardValue} ${styles.profit}`}>{fmt(totals.profit)}</div>
-          <div className={styles.cardSub} style={{ color: '#10B981' }}>{pct(totals.profit, totals.revenue)} margin</div>
+          <div className={`${styles.cardValue} ${styles.profit}`}>{spin(activeData?.net_profit)}</div>
+          <div className={styles.cardSub} style={{ color: '#10B981' }}>
+            {activeLoading ? '…' : pct(totals.profit, totals.revenue)} margin
+          </div>
         </div>
+        <div className={styles.card}>
+          <div className={styles.cardLabel}>Shipments</div>
+          <div className={styles.cardValue}>
+            {activeLoading ? '…' : displayShipments.toLocaleString()}
+          </div>
+          <div className={styles.cardSub}>this period</div>
+        </div>
+      </div>
+
+      {/* ── Row 2: Distribution + Payment status ─────────────────── */}
+      <div className={styles.statsRow2}>
+        {/* BAEKO (30%) */}
         <div className={styles.card}>
           <div className={styles.cardLabel}>BAEKO (30%)</div>
-          <div className={styles.cardValue} style={{ color: '#FD4C1D' }}>{fmt(totals.baeko)}</div>
-          <div className={styles.cardSub}>of net profit</div>
+          <div className={styles.cardValue} style={{ color: '#3B82F6' }}>
+            {spin(activeData?.baeko_amount)}
+          </div>
+          {!activeLoading && currentPeriodPaid !== null && (
+            <>
+              <div className={styles.cardPayLine}>
+                <span className={styles.cardPayLabel}>Paid</span>
+                <span className={currentPeriodPaid.baeko > 0 ? styles.amountPaid : styles.amountUnpaid}>
+                  {fmt(currentPeriodPaid.baeko)}
+                </span>
+              </div>
+              <div className={styles.cardPayLine}>
+                <span className={styles.cardPayLabel}>Unpaid</span>
+                <span className={styles.amountUnpaid}>
+                  {fmt(Math.max(0, totals.baeko - currentPeriodPaid.baeko))}
+                </span>
+              </div>
+            </>
+          )}
         </div>
+
+        {/* Sales (10%) */}
         <div className={styles.card}>
-          <div className={styles.cardLabel}>Sales Commission (10%)</div>
-          <div className={styles.cardValue} style={{ color: '#F59E0B' }}>{fmt(totals.sales)}</div>
-          <div className={styles.cardSub}>{byPerson.length} sales persons</div>
+          <div className={styles.cardLabel}>Sales (10%)</div>
+          <div className={styles.cardValue} style={{ color: '#F59E0B' }}>
+            {spin(activeData?.sales_amount)}
+          </div>
+          {!activeLoading && currentPeriodPaid !== null && (
+            <>
+              <div className={styles.cardPayLine}>
+                <span className={styles.cardPayLabel}>Paid</span>
+                <span className={currentPeriodPaid.salesTotal > 0 ? styles.amountPaid : styles.amountUnpaid}>
+                  {fmt(currentPeriodPaid.salesTotal)}
+                </span>
+              </div>
+              <div className={styles.cardPayLine}>
+                <span className={styles.cardPayLabel}>Unpaid</span>
+                <span className={styles.amountUnpaid}>
+                  {fmt(Math.max(0, totals.sales - currentPeriodPaid.salesTotal))}
+                </span>
+              </div>
+            </>
+          )}
         </div>
+
+        {/* Sales Person breakdown */}
+        <div className={styles.card}>
+          <div className={styles.cardLabel}>Sales Persons</div>
+          {activeLoading ? (
+            <div className={styles.muted} style={{ fontSize: 13, marginTop: 8 }}>Loading…</div>
+          ) : displaySalesPersons.length === 0 ? (
+            <div className={styles.muted} style={{ fontSize: 12, marginTop: 8 }}>No commissions this period</div>
+          ) : (
+            <div className={styles.salesPersonGrid}>
+              {displaySalesPersons.map(sp => {
+                const paid = currentPeriodPaid?.byPerson[sp.sales_person] ?? 0
+                const comm = n2(sp.commission)
+                const isPaid = comm > 0 && paid >= comm * 0.99
+                return (
+                  <div key={sp.sales_person_id} className={styles.salesPersonItem}>
+                    <div className={styles.salesPersonName}>{sp.sales_person}</div>
+                    <div className={styles.salesPersonAmount}>{fmt(comm)}</div>
+                    {currentPeriodPaid !== null && (
+                      <div className={`${styles.salesPersonPaid} ${isPaid ? styles.salesPersonPaidYes : styles.salesPersonPaidNo}`}>
+                        {isPaid ? '✓ Paid' : 'Unpaid'}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Overhead (60%) */}
         <div className={styles.card}>
           <div className={styles.cardLabel}>Overhead (60%)</div>
-          <div className={styles.cardValue} style={{ color: '#10B981' }}>{fmt(totals.overhead)}</div>
+          <div className={styles.cardValue} style={{ color: '#10B981' }}>
+            {spin(activeData?.overhead_amount)}
+          </div>
           <div className={styles.cardSub}>operating expenses</div>
         </div>
       </div>
 
-      {/* ── Distribution + Commission ───────────────────────── */}
+      {/* ── Cumulative Payment Summary ──────────────────────────── */}
+      {summaryData && (
+        <div className={styles.section}>
+          <div className={styles.sectionTitle}>
+            Cumulative Payment Summary
+            <span className={styles.sectionHint}>Since Dec 2024</span>
+          </div>
+          <table className={styles.summaryTable}>
+            <thead>
+              <tr>
+                <th></th>
+                <th>Earned</th>
+                <th>Paid</th>
+                <th>Unpaid</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className={styles.rowBaeko}>
+                <td>BAEKO</td>
+                <td>{fmt(summaryData.baeko.totalEarned)}</td>
+                <td className={summaryData.baeko.totalPaid > 0 ? styles.amountPaid : styles.amountUnpaid}>
+                  {fmt(summaryData.baeko.totalPaid)}
+                </td>
+                <td className={summaryData.baeko.totalUnpaid > 0 ? styles.amountUnpaid : styles.amountPaid}>
+                  {fmt(summaryData.baeko.totalUnpaid)}
+                </td>
+              </tr>
+              {summaryData.salesPersons.map(sp => (
+                <tr key={sp.name} className={styles.rowSales}>
+                  <td>{sp.name}</td>
+                  <td>{fmt(sp.totalEarned)}</td>
+                  <td className={sp.totalPaid > 0 ? styles.amountPaid : styles.amountUnpaid}>
+                    {fmt(sp.totalPaid)}
+                  </td>
+                  <td className={sp.totalUnpaid > 0 ? styles.amountUnpaid : styles.amountPaid}>
+                    {fmt(sp.totalUnpaid)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              {(() => {
+                const totalEarned = summaryData.baeko.totalEarned
+                  + summaryData.salesPersons.reduce((a, s) => a + s.totalEarned, 0)
+                return (
+                  <tr className={styles.rowTotal}>
+                    <td>TOTAL</td>
+                    <td>{fmt(totalEarned)}</td>
+                    <td className={summaryData.totalPaid > 0 ? styles.amountPaid : styles.amountUnpaid}>
+                      {fmt(summaryData.totalPaid)}
+                    </td>
+                    <td className={summaryData.totalUnpaid > 0 ? styles.amountUnpaid : styles.amountPaid}>
+                      {fmt(summaryData.totalUnpaid)}
+                    </td>
+                  </tr>
+                )
+              })()}
+            </tfoot>
+          </table>
+        </div>
+      )}
+
+      {/* ── Distribution + Commission table ───────────────────── */}
       <div className={styles.row}>
         <div className={styles.section}>
           <div className={styles.sectionTitle}>Profit Distribution</div>
@@ -726,7 +1138,7 @@ export default function SettlementPage() {
                     <span className={styles.distDot} style={{ background: d.color }} />
                     {d.label}
                   </div>
-                  <span className={styles.distValue}>{fmt(d.value)}</span>
+                  <span className={styles.distValue}>{activeLoading ? '…' : fmt(d.value)}</span>
                 </div>
                 <div className={styles.barBg}>
                   <div className={styles.barFill} style={{ width: `${d.pctVal}%`, background: d.color }} />
@@ -737,15 +1149,15 @@ export default function SettlementPage() {
           <div className={styles.formula}>
             <div className={styles.formulaRow}>
               <span className={styles.formulaLabel}>Revenue</span>
-              <span>{fmt(totals.revenue)}</span>
+              <span>{activeLoading ? '…' : fmt(totals.revenue)}</span>
             </div>
             <div className={styles.formulaRow}>
               <span className={styles.formulaLabel}>− UPS Cost</span>
-              <span className={styles.negative}>{fmt(totals.cost)}</span>
+              <span className={styles.negative}>{activeLoading ? '…' : fmt(totals.cost)}</span>
             </div>
             <div className={`${styles.formulaRow} ${styles.formulaTotal}`}>
               <span className={styles.formulaLabel}>= Net Profit</span>
-              <span className={styles.profit}>{fmt(totals.profit)}</span>
+              <span className={styles.profit}>{activeLoading ? '…' : fmt(totals.profit)}</span>
             </div>
           </div>
         </div>
@@ -765,25 +1177,26 @@ export default function SettlementPage() {
                 </tr>
               </thead>
               <tbody>
-                {byPerson.length === 0 && (
-                  <tr><td colSpan={6} className={styles.empty}>No data for this month.</td></tr>
-                )}
-                {byPerson.map(p => (
-                  <tr key={p.name}>
-                    <td><div className={styles.personName}>{p.name}</div></td>
-                    <td className={styles.tdRight}>{p.count}</td>
-                    <td className={styles.tdRight}>{fmt(p.revenue)}</td>
-                    <td className={`${styles.tdRight} ${styles.muted}`}>{fmt(p.cost)}</td>
-                    <td className={styles.tdRight}>{fmt(p.profit)}</td>
-                    <td className={`${styles.tdRight} ${styles.commissionCell}`}>{fmt(p.commission)}</td>
+                {activeLoading ? (
+                  <tr><td colSpan={6} className={styles.empty}>Loading…</td></tr>
+                ) : displaySalesPersons.length === 0 ? (
+                  <tr><td colSpan={6} className={styles.empty}>No commission data for this period.</td></tr>
+                ) : displaySalesPersons.map(sp => (
+                  <tr key={sp.sales_person_id}>
+                    <td><div className={styles.personName}>{sp.sales_person}</div></td>
+                    <td className={styles.tdRight}>{sp.shipments.toLocaleString()}</td>
+                    <td className={styles.tdRight}>{fmt(n2(sp.revenue))}</td>
+                    <td className={`${styles.tdRight} ${styles.muted}`}>{fmt(n2(sp.ups_cost))}</td>
+                    <td className={styles.tdRight}>{fmt(n2(sp.profit))}</td>
+                    <td className={`${styles.tdRight} ${styles.commissionCell}`}>{fmt(n2(sp.commission))}</td>
                   </tr>
                 ))}
               </tbody>
-              {byPerson.length > 0 && (
+              {!activeLoading && displaySalesPersons.length > 0 && (
                 <tfoot>
                   <tr className={styles.footRow}>
                     <td className={styles.footLabel}>Total</td>
-                    <td className={styles.tdRight}>{filtered.length}</td>
+                    <td className={styles.tdRight}>{displayShipments.toLocaleString()}</td>
                     <td className={styles.tdRight}>{fmt(totals.revenue)}</td>
                     <td className={`${styles.tdRight} ${styles.muted}`}>{fmt(totals.cost)}</td>
                     <td className={styles.tdRight}>{fmt(totals.profit)}</td>
@@ -796,65 +1209,183 @@ export default function SettlementPage() {
         </div>
       </div>
 
-      {/* ── Settlement History ──────────────────────────────── */}
+      {/* ── History: Unpaid / In Progress ──────────────────────── */}
       <div className={styles.section}>
         <div className={styles.sectionTitle}>
           Settlement History
-          <span className={styles.sectionHint}>Click a row to view & edit payment records</span>
+          <span className={styles.sectionHint}>Click a row to view &amp; edit payment records</span>
+          <button className={styles.exportBtn} onClick={handleExportExcel}
+            disabled={histLoading || filteredHistory.length === 0}>
+            ↓ Export Excel
+          </button>
         </div>
-        <div className={styles.tableWrap}>
+
+        {/* ── Unpaid section ─────────────────────────────────── */}
+        <div className={styles.histSectionHead + ' ' + styles.histSectionUnpaid}>
+          ⚠ Unpaid / In Progress
+          <span style={{ marginLeft: 8, fontWeight: 400, fontSize: 11 }}>
+            {histLoading ? '…' : `${unpaidRows.length} month${unpaidRows.length !== 1 ? 's' : ''}`}
+          </span>
+        </div>
+        <div className={styles.tableWrap} style={{ marginBottom: 20 }}>
           <table className={styles.table}>
             <thead>
               <tr>
                 <th>Month</th>
+                <th className={styles.thRight}>Shipments</th>
                 <th className={styles.thRight}>Revenue</th>
                 <th className={styles.thRight}>UPS Cost</th>
                 <th className={styles.thRight}>Net Profit</th>
                 <th className={styles.thRight}>BAEKO (30%)</th>
                 <th className={styles.thRight}>Sales (10%)</th>
                 <th className={styles.thRight}>Overhead (60%)</th>
-                <th className={styles.thCenter}>BAEKO Payment</th>
-                <th className={styles.thCenter}>Sales Payment</th>
+                <th className={styles.thCenter}>BAEKO</th>
+                {activeSalesPersons.map(name => (
+                  <th key={name} className={styles.thCenter}>{name.split(' ')[0]}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {[...history].reverse().map(row => (
+              {histLoading ? (
+                <tr><td colSpan={histColSpan} className={styles.empty}>Loading history…</td></tr>
+              ) : unpaidRows.length === 0 ? (
+                <tr><td colSpan={histColSpan} className={styles.empty}>All months are fully paid. 🎉</td></tr>
+              ) : unpaidRows.map(row => (
                 <tr key={row.month} className={styles.historyRow} onClick={() => setDetailRow(row)}>
                   <td className={styles.monthCell}>{mLabel(row.month)}</td>
-                  <td className={styles.tdRight}>{fmt(row.revenue)}</td>
-                  <td className={`${styles.tdRight} ${styles.muted}`}>{fmt(row.upsCost)}</td>
-                  <td className={`${styles.tdRight} ${styles.profit}`}>{fmt(row.netProfit)}</td>
-                  <td className={styles.tdRight} style={{ color: '#FD4C1D', fontWeight: 600 }}>{fmt(row.baekoAmt)}</td>
-                  <td className={styles.tdRight} style={{ color: '#F59E0B', fontWeight: 600 }}>{fmt(row.salesAmt)}</td>
-                  <td className={`${styles.tdRight} ${styles.muted}`}>{fmt(row.overheadAmt)}</td>
-                  <td className={styles.tdCenter}><BaekoCell row={row} payments={payments} /></td>
-                  <td className={styles.tdCenter}><SalesCell row={row} payments={payments} /></td>
+                  <td className={styles.tdRight}>{n2(row.shipments).toLocaleString()}</td>
+                  <td className={styles.tdRight}>{fmt(n2(row.revenue))}</td>
+                  <td className={`${styles.tdRight} ${styles.muted}`}>{fmt(n2(row.ups_cost))}</td>
+                  <td className={`${styles.tdRight} ${styles.profit}`}>{fmt(n2(row.net_profit))}</td>
+                  <td className={styles.tdRight} style={{ color: '#FD4C1D', fontWeight: 600 }}>
+                    {fmt(n2(row.baeko_amount))}
+                  </td>
+                  <td className={styles.tdRight} style={{ color: '#F59E0B', fontWeight: 600 }}>
+                    {fmt(n2(row.sales_amount))}
+                  </td>
+                  <td className={`${styles.tdRight} ${styles.muted}`}>{fmt(n2(row.overhead_amount))}</td>
+                  <td className={styles.tdCenter}><BaekoCell row={row} /></td>
+                  {activeSalesPersons.map(name => (
+                    <td key={name} className={styles.tdCenter}><SpCell row={row} name={name} /></td>
+                  ))}
                 </tr>
               ))}
             </tbody>
+            {!histLoading && unpaidRows.length > 0 && (() => {
+              const t = sumRows(unpaidRows)
+              return (
+                <tfoot>
+                  <tr className={styles.footRow}>
+                    <td className={styles.footLabel}>Total ({unpaidRows.length})</td>
+                    <td className={styles.tdRight}>{t.shipments.toLocaleString()}</td>
+                    <td className={styles.tdRight}>{fmt(t.revenue)}</td>
+                    <td className={`${styles.tdRight} ${styles.muted}`}>{fmt(t.ups_cost)}</td>
+                    <td className={`${styles.tdRight} ${styles.profit}`}>{fmt(t.net_profit)}</td>
+                    <td className={styles.tdRight} style={{ color: '#FD4C1D', fontWeight: 600 }}>{fmt(t.baeko)}</td>
+                    <td className={styles.tdRight} style={{ color: '#F59E0B', fontWeight: 600 }}>{fmt(t.sales)}</td>
+                    <td className={`${styles.tdRight} ${styles.muted}`}>{fmt(t.overhead)}</td>
+                    <td />{activeSalesPersons.map(name => <td key={name} />)}
+                  </tr>
+                </tfoot>
+              )
+            })()}
           </table>
         </div>
+
+        {/* ── Paid History section ────────────────────────────── */}
+        <div className={styles.histSectionHead + ' ' + styles.histSectionPaid}>
+          ✓ Paid History
+          <span style={{ marginLeft: 8, fontWeight: 400, fontSize: 11 }}>
+            {histLoading ? '…' : `${paidRows.length} month${paidRows.length !== 1 ? 's' : ''}`}
+          </span>
+          <button
+            className={styles.showHideBtn}
+            onClick={() => setShowPaidHistory(v => !v)}>
+            {showPaidHistory ? 'Hide' : 'Show'}
+          </button>
+        </div>
+        {showPaidHistory && (
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  <th className={styles.thRight}>Shipments</th>
+                  <th className={styles.thRight}>Revenue</th>
+                  <th className={styles.thRight}>UPS Cost</th>
+                  <th className={styles.thRight}>Net Profit</th>
+                  <th className={styles.thRight}>BAEKO (30%)</th>
+                  <th className={styles.thRight}>Sales (10%)</th>
+                  <th className={styles.thRight}>Overhead (60%)</th>
+                  <th className={styles.thCenter}>BAEKO</th>
+                  {activeSalesPersons.map(name => (
+                    <th key={name} className={styles.thCenter}>{name.split(' ')[0]}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {paidRows.length === 0 ? (
+                  <tr><td colSpan={histColSpan} className={styles.empty}>No fully paid months yet.</td></tr>
+                ) : paidRows.map(row => (
+                  <tr key={row.month} className={styles.historyRow} onClick={() => setDetailRow(row)}>
+                    <td className={styles.monthCell}>{mLabel(row.month)}</td>
+                    <td className={styles.tdRight}>{n2(row.shipments).toLocaleString()}</td>
+                    <td className={styles.tdRight}>{fmt(n2(row.revenue))}</td>
+                    <td className={`${styles.tdRight} ${styles.muted}`}>{fmt(n2(row.ups_cost))}</td>
+                    <td className={`${styles.tdRight} ${styles.profit}`}>{fmt(n2(row.net_profit))}</td>
+                    <td className={styles.tdRight} style={{ color: '#FD4C1D', fontWeight: 600 }}>
+                      {fmt(n2(row.baeko_amount))}
+                    </td>
+                    <td className={styles.tdRight} style={{ color: '#F59E0B', fontWeight: 600 }}>
+                      {fmt(n2(row.sales_amount))}
+                    </td>
+                    <td className={`${styles.tdRight} ${styles.muted}`}>{fmt(n2(row.overhead_amount))}</td>
+                    <td className={styles.tdCenter}><BaekoCell row={row} /></td>
+                    {activeSalesPersons.map(name => (
+                      <td key={name} className={styles.tdCenter}><SpCell row={row} name={name} /></td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+              {paidRows.length > 0 && (() => {
+                const t = sumRows(paidRows)
+                return (
+                  <tfoot>
+                    <tr className={styles.footRow}>
+                      <td className={styles.footLabel}>Total ({paidRows.length})</td>
+                      <td className={styles.tdRight}>{t.shipments.toLocaleString()}</td>
+                      <td className={styles.tdRight}>{fmt(t.revenue)}</td>
+                      <td className={`${styles.tdRight} ${styles.muted}`}>{fmt(t.ups_cost)}</td>
+                      <td className={`${styles.tdRight} ${styles.profit}`}>{fmt(t.net_profit)}</td>
+                      <td className={styles.tdRight} style={{ color: '#FD4C1D', fontWeight: 600 }}>{fmt(t.baeko)}</td>
+                      <td className={styles.tdRight} style={{ color: '#F59E0B', fontWeight: 600 }}>{fmt(t.sales)}</td>
+                      <td className={`${styles.tdRight} ${styles.muted}`}>{fmt(t.overhead)}</td>
+                      <td />{activeSalesPersons.map(name => <td key={name} />)}
+                    </tr>
+                  </tfoot>
+                )
+              })()}
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* ── Modals ─────────────────────────────────────────── */}
-      {showPayModal && (
+      {/* ── Modals ─────────────────────────────────────────────── */}
+      {showPayModal && filteredHistory.length > 0 && (
         <PayModal
-          history={history}
-          payments={payments}
-          onSave={rec => { setPayments(p => [...p, rec]); setShowPayModal(false) }}
+          historyRows={filteredHistory}
+          onFetchMonth={fetchMonth}
+          onSave={handleSavePayment}
           onClose={() => setShowPayModal(false)}
         />
       )}
       {detailRow && (
         <DetailModal
           row={detailRow}
-          payments={payments}
-          onUpdate={handleUpdatePayment}
-          onDelete={handleDeletePayment}
+          onReload={handleDetailReload}
           onClose={() => setDetailRow(null)}
         />
       )}
-
     </div>
   )
 }

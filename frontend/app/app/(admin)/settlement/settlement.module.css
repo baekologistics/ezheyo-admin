@@ -58,6 +58,79 @@
 .cardValue  { font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
 .cardSub    { font-size: 11px; color: var(--muted); }
 
+/* ── 2-row stats layout ──────────────────────────────────────── */
+.statsRow1 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+.statsRow2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 2fr 1fr;
+  gap: 12px;
+}
+
+.cardPayLine {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11.5px;
+  margin-top: 4px;
+}
+.cardPayLabel { color: var(--muted); }
+
+.amountPaid   { color: #16A34A; font-weight: 600; }
+.amountUnpaid { color: #DC2626; font-weight: 600; }
+
+/* ── Sales Person card breakdown ─────────────────────────────── */
+.salesPersonGrid {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.salesPersonItem  { flex: 1; min-width: 110px; }
+.salesPersonName  { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+.salesPersonAmount { font-size: 16px; font-weight: 700; color: #FD4C1D; margin-bottom: 2px; }
+.salesPersonPaid   { font-size: 11px; }
+.salesPersonPaidYes { color: #16A34A; }
+.salesPersonPaidNo  { color: #DC2626; }
+
+/* ── Cumulative summary table ────────────────────────────────── */
+.summaryTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.summaryTable th {
+  padding: 8px 16px;
+  text-align: right;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.summaryTable th:first-child { text-align: left; }
+.summaryTable td {
+  padding: 10px 16px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.summaryTable tbody tr:last-child td { border-bottom: none; }
+.summaryTable td:first-child { text-align: left; font-weight: 500; }
+.rowBaeko td:first-child { border-left: 3px solid #3B82F6; padding-left: 13px; }
+.rowSales td:first-child { border-left: 3px solid var(--orange); padding-left: 13px; }
+.rowTotal td {
+  background: var(--surface);
+  font-weight: 700;
+  border-top: 2px solid var(--border);
+  border-bottom: none;
+}
+
 /* ── Two-col row ────────────────────────────────────────────── */
 .row { display: grid; grid-template-columns: 320px 1fr; gap: 20px; align-items: start; }
 
@@ -77,6 +150,24 @@
   gap: 10px;
 }
 .sectionHint { font-size: 12px; font-weight: 400; color: var(--muted); }
+
+.exportBtn {
+  margin-left: auto;
+  height: 32px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 7px;
+  background: #16A34A;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.exportBtn:hover:not(:disabled) { background: #15803D; }
+.exportBtn:disabled { opacity: 0.45; cursor: default; }
 
 /* ── Distribution ───────────────────────────────────────────── */
 .distList  { display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; }
@@ -370,6 +461,197 @@
 .editLineMemo { grid-column: 2 / -1; }
 .editActions  { display: flex; justify-content: flex-end; gap: 8px; padding-top: 8px; }
 
+/* ── Payment Summary section ────────────────────────────────── */
+.summaryList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.summaryRow {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  border-left: 3px solid transparent;
+}
+.summaryRow:last-child { border-bottom: none; }
+
+.summaryRowBaeko { border-left-color: #3B82F6; }
+.summaryRowSp    { border-left-color: var(--orange); }
+.summaryRowTotal {
+  border-left-color: var(--border);
+  background: var(--surface);
+  font-weight: 700;
+}
+
+.summaryName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 140px;
+  flex-shrink: 0;
+}
+
+.summaryAmts {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.summaryItem {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 100px;
+}
+
+.summaryItemLabel {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.summaryItemVal  { font-size: 15px; font-weight: 700; color: var(--text); }
+.summaryItemPaid   { color: #059669; }
+.summaryItemUnpaid { color: #DC2626; }
+
+/* ── History section headers ─────────────────────────────────── */
+.histSectionHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.histSectionUnpaid {
+  background: #FFFBEB;
+  color: #92400E;
+  border: 1px solid #FDE68A;
+}
+
+.histSectionPaid {
+  background: #F0FDF4;
+  color: #065F46;
+  border: 1px solid #A7F3D0;
+}
+
+.showHideBtn {
+  margin-left: auto;
+  height: 26px;
+  padding: 0 12px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  color: inherit;
+  opacity: 0.8;
+}
+.showHideBtn:hover { opacity: 1; }
+
+/* ── Filter bar (view mode toggle + range controls) ────────── */
+.filterBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.viewToggle {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.toggleBtn {
+  height: 36px;
+  padding: 0 16px;
+  border: none;
+  background: var(--white);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--muted);
+  cursor: pointer;
+  border-right: 1px solid var(--border);
+}
+.toggleBtn:last-child { border-right: none; }
+.toggleBtn:hover:not(.toggleBtnActive) { background: var(--surface); color: var(--text); }
+.toggleBtnActive {
+  background: var(--orange);
+  color: #fff;
+  font-weight: 600;
+}
+
+.rangeControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rangeLabel {
+  font-size: 12px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.rangeInput {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--white);
+  color: var(--text);
+  outline: none;
+}
+.rangeInput:focus { border-color: var(--orange); }
+
+.queryBtn {
+  height: 36px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 8px;
+  background: var(--orange);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.queryBtn:hover { background: var(--orange-dark); }
+.queryBtn:disabled { opacity: 0.45; cursor: default; }
+
+.rangeNote {
+  font-size: 12px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* ── Sales-person commission amount in history table ────────── */
+.spCommAmt {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
 /* ── Utility ────────────────────────────────────────────────── */
 .muted    { color: var(--muted); }
 .negative { color: #EF4444; }
@@ -378,11 +660,17 @@
 
 /* ── Responsive ─────────────────────────────────────────────── */
 @media (max-width: 1400px) {
-  .cards { grid-template-columns: repeat(3, 1fr); }
+  .cards     { grid-template-columns: repeat(3, 1fr); }
+  .statsRow2 { grid-template-columns: 1fr 1fr 1fr; }
+  .statsRow2 > :nth-child(4) { grid-column: 1 / -1; }
 }
 @media (max-width: 1100px) {
-  .row   { grid-template-columns: 1fr; }
-  .cards { grid-template-columns: repeat(2, 1fr); }
+  .row       { grid-template-columns: 1fr; }
+  .cards     { grid-template-columns: repeat(2, 1fr); }
+  .statsRow1 { grid-template-columns: repeat(2, 1fr); }
+  .statsRow2 { grid-template-columns: 1fr 1fr; }
+  .statsRow2 > :nth-child(3),
+  .statsRow2 > :nth-child(4) { grid-column: 1 / -1; }
 }
 @media (max-width: 760px) {
   .splitLineGrid { grid-template-columns: 1fr 1fr; }

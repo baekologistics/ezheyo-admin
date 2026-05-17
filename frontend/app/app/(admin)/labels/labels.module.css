@@ -21,11 +21,11 @@
 .syncToastErr { background: #FEE2E2; border-color: #FCA5A5; color: #991B1B; }
 
 /* ── Cancelled row ───────────────────────────────────────── */
-.rowCancelled td    { opacity: 0.5; }
-.rowCancelled:hover td { opacity: 0.7; }
+.rowCancelled td    { opacity: 0.6; }
+.rowCancelled:hover td { opacity: 0.8; }
 .cancelBadge {
-  display: inline-block; padding: 3px 8px; border-radius: 20px;
-  font-size: 11px; font-weight: 600;
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  font-size: 11px;
   background: #FEE2E2; color: #991B1B;
 }
 
