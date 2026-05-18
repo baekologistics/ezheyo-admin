@@ -31,7 +31,7 @@ function fromRow(r: Record<string, unknown>): Customer {
   }
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+import { authFetch } from '@/lib/auth'
 
 // ── Filter type ──────────────────────────────────────────────
 // 'all' | 'active' | 'unassigned' | '<sales person name>'
@@ -90,11 +90,11 @@ export default function CustomersPage() {
     setLoading(true)
     setError(null)
     Promise.all([
-      fetch(`${API}/api/customers`).then(r => {
+      authFetch('/api/customers').then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json() as Promise<Record<string, unknown>[]>
       }),
-      fetch(`${API}/api/settings/sales-persons`).then(r => r.json()) as Promise<SalesPerson[]>,
+      authFetch('/api/settings/sales-persons').then(r => r.json()) as Promise<SalesPerson[]>,
     ])
       .then(([rows, sps]) => {
         setCustomers(rows.map(fromRow))
@@ -114,16 +114,14 @@ export default function CustomersPage() {
     memo: string
   ) => {
     try {
-      await fetch(`${API}/api/customers/${id}`, {
-        method:  'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ memo }),
+      await authFetch(`/api/customers/${id}`, {
+        method: 'PATCH',
+        body:   JSON.stringify({ memo }),
       })
 
-      const res = await fetch(`${API}/api/customers/${id}/sales-persons`, {
-        method:  'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(assignments),
+      const res = await authFetch(`/api/customers/${id}/sales-persons`, {
+        method: 'PUT',
+        body:   JSON.stringify(assignments),
       })
       const updated = await res.json() as Array<{ id: string; name: string; ratio: number }>
 

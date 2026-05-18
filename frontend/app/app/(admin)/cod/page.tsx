@@ -2,8 +2,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import styles from './cod.module.css'
 import EmailPreviewModal from './EmailPreviewModal'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+import { authFetch } from '@/lib/auth'
 
 // ── Frontend types ────────────────────────────────────────────
 export type CodRecord = {
@@ -222,7 +221,7 @@ export default function CodPage() {
   const loadStatements = useCallback(async () => {
     setLoadingStmts(true)
     try {
-      const res = await fetch(`${API_URL}/api/cod/statements`)
+      const res = await authFetch('/api/cod/statements')
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = (await res.json()) as ApiStatement[]
       setStatements(data.map(mapStatement))
@@ -237,7 +236,7 @@ export default function CodPage() {
   const loadAllRecords = useCallback(async () => {
     setLoadingRecs(true)
     try {
-      const res = await fetch(`${API_URL}/api/cod/records`)
+      const res = await authFetch('/api/cod/records')
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = (await res.json()) as ApiRecord[]
       setRecords(data.map(mapRecord))
@@ -255,7 +254,7 @@ export default function CodPage() {
     try {
       const results = await Promise.all(
         stmtIds.map(id =>
-          fetch(`${API_URL}/api/cod/records?statement_id=${id}`)
+          authFetch(`/api/cod/records?statement_id=${id}`)
             .then(r => r.ok ? r.json() as Promise<ApiRecord[]> : Promise.resolve([]))
         )
       )
@@ -348,7 +347,7 @@ export default function CodPage() {
       const formData = new FormData()
       formData.append('file', file)
 
-      const res = await fetch(`${API_URL}/api/cod/statements/upload`, {
+      const res = await authFetch(`/api/cod/statements/upload`, {
         method: 'POST',
         body:   formData,
       })

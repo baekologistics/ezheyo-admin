@@ -2,8 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import styles from './requests.module.css'
 import RequestDetailModal, { RequestItem } from './RequestDetailModal'
-
-const API_URL   = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+import { authFetch } from '@/lib/auth'
 const PAGE_LIMIT = 50
 
 // ── Types ─────────────────────────────────────────────────────
@@ -86,7 +85,7 @@ export default function RequestsPage() {
 
   // ── Load types on mount ──────────────────────────────────
   useEffect(() => {
-    fetch(`${API_URL}/api/requests/types`)
+    authFetch('/api/requests/types')
       .then(r => r.json())
       .then((data: RequestType[]) => setTypes(Array.isArray(data) ? data : []))
       .catch(() => {})
@@ -94,7 +93,7 @@ export default function RequestsPage() {
 
   // ── Load stats ───────────────────────────────────────────
   const loadStats = useCallback(() => {
-    fetch(`${API_URL}/api/requests/stats`)
+    authFetch('/api/requests/stats')
       .then(r => r.json())
       .then((data: Stats) => setStats(data))
       .catch(() => {})
@@ -120,7 +119,7 @@ export default function RequestsPage() {
     setLoading(true)
     setError('')
     try {
-      const res  = await fetch(`${API_URL}/api/requests?${buildParams(pg)}`)
+      const res  = await authFetch(`/api/requests?${buildParams(pg)}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = (await res.json()) as ApiResponse
       setRequests(Array.isArray(data.requests) ? data.requests : [])

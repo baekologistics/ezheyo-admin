@@ -1,8 +1,7 @@
 'use client'
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import styles from './labels.module.css'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+import { authFetch } from '@/lib/auth'
 const PAGE_LIMIT = 50
 
 // ── Date helpers ──────────────────────────────────────────────
@@ -329,7 +328,7 @@ export default function LabelsPage() {
     setStatsLoading(true)
     try {
       const p = buildFilterParams()
-      const res = await fetch(`${API_URL}/api/orders/stats?${p}`)
+      const res = await authFetch(`/api/orders/stats?${p}`)
       if (!res.ok) return
       setStats(await res.json())
     } catch { /* silently ignore */ }
@@ -338,7 +337,7 @@ export default function LabelsPage() {
 
   // ── Fetch customer list ───────────────────────────────────
   useEffect(() => {
-    fetch(`${API_URL}/api/customers`)
+    authFetch('/api/customers')
       .then(r => r.json())
       .then((data: Array<{ name: string }>) => {
         setAllCustomers(Array.from(new Set(data.map(c => c.name).filter(Boolean))).sort())
@@ -348,7 +347,7 @@ export default function LabelsPage() {
 
   // ── Fetch sales persons ───────────────────────────────────
   useEffect(() => {
-    fetch(`${API_URL}/api/settings/sales-persons`)
+    authFetch('/api/settings/sales-persons')
       .then(r => r.json())
       .then((data: SalesPerson[]) => setSalesPersons(Array.isArray(data) ? data.filter(s => s.is_active) : []))
       .catch(() => {})
@@ -363,7 +362,7 @@ export default function LabelsPage() {
       params.set('page',  String(pg))
       params.set('limit', String(PAGE_LIMIT))
 
-      const res = await fetch(`${API_URL}/api/orders?${params}`)
+      const res = await authFetch(`/api/orders?${params}`)
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = (await res.json()) as ApiResponse
       if (!Array.isArray(data.orders)) {
@@ -405,7 +404,7 @@ export default function LabelsPage() {
     setSyncMsg('')
     try {
       const date = today()
-      const res = await fetch(`${API_URL}/api/sync/orders`, {
+      const res = await authFetch(`/api/sync/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date }),

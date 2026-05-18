@@ -1,8 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import styles from './requests.module.css'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+import { authFetch } from '@/lib/auth'
 
 export type RequestItem = {
   id:            string
@@ -69,15 +68,14 @@ export default function RequestDetailModal({ request, onClose, onUpdate }: Props
     setSaving(true)
     setSaveMsg('')
     try {
-      const res = await fetch(`${API_URL}/api/requests/${current.id}`, {
+      const res = await authFetch(`/api/requests/${current.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const updated = await res.json() as RequestItem
       // Re-fetch full record with joins
-      const full = await fetch(`${API_URL}/api/requests/${current.id}`)
+      const full = await authFetch(`/api/requests/${current.id}`)
       const fullData = full.ok ? (await full.json()) as RequestItem : { ...current, ...updated }
       setCurrent(fullData)
       onUpdate(fullData)

@@ -12,17 +12,26 @@ export type AuthUser = {
 
 // ── Token helpers ─────────────────────────────────────────────────
 export function getToken(): string | undefined {
-  return Cookies.get(TOKEN_KEY)
+  // Cookie first (for middleware), then localStorage as fallback
+  return (
+    Cookies.get(TOKEN_KEY) ||
+    (typeof localStorage !== 'undefined' ? localStorage.getItem(TOKEN_KEY) ?? undefined : undefined)
+  )
 }
 
 export function setToken(token: string): void {
   Cookies.set(TOKEN_KEY, token, { expires: 7, sameSite: 'strict' })
+  // Also store in localStorage so client-side reads are always reliable
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(TOKEN_KEY, token)
+  }
 }
 
 export function removeToken(): void {
   Cookies.remove(TOKEN_KEY)
   Cookies.remove(USER_KEY)
   if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(USER_KEY)
   }
 }
@@ -49,14 +58,16 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
 export async function authFetch(input: string, init?: RequestInit): Promise<Response> {
   const token = getToken()
-  return fetch(`${API_URL}${input}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  })
+  const isFormData = init?.body instanceof FormData
+
+  const headers: Record<string, string> = {
+    // Don't set Content-Type for FormData — browser sets it with boundary
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+    ...(init?.headers as Record<string, string> ?? {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
+
+  return fetch(`${API_URL}${input}`, { ...init, headers })
 }
 
 // ── Log page view ─────────────────────────────────────────────────

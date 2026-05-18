@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import styles from './settings.module.css'
+import { authFetch } from '@/lib/auth'
 
 type SalesPerson = {
   id: string
@@ -9,8 +10,6 @@ type SalesPerson = {
   phone: string
   is_active: boolean
 }
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
 export default function SettingsPage() {
   const [persons,    setPersons]    = useState<SalesPerson[]>([])
@@ -24,7 +23,7 @@ export default function SettingsPage() {
 
   const load = () => {
     setLoading(true)
-    fetch(`${API}/api/settings/sales-persons`)
+    authFetch('/api/settings/sales-persons')
       .then(r => r.json() as Promise<SalesPerson[]>)
       .then(data => { setPersons(data); setLoading(false) })
       .catch(err => { setError((err as Error).message); setLoading(false) })
@@ -51,16 +50,14 @@ export default function SettingsPage() {
     setSaving(true)
     try {
       if (editTarget) {
-        await fetch(`${API}/api/settings/sales-persons/${editTarget.id}`, {
-          method:  'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify(form),
+        await authFetch(`/api/settings/sales-persons/${editTarget.id}`, {
+          method: 'PUT',
+          body:   JSON.stringify(form),
         })
       } else {
-        await fetch(`${API}/api/settings/sales-persons`, {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify(form),
+        await authFetch('/api/settings/sales-persons', {
+          method: 'POST',
+          body:   JSON.stringify(form),
         })
       }
       setShowForm(false)
@@ -74,15 +71,14 @@ export default function SettingsPage() {
 
   const handleDeactivate = async (sp: SalesPerson) => {
     if (!confirm(`Deactivate ${sp.name}? They will no longer appear in new assignments.`)) return
-    await fetch(`${API}/api/settings/sales-persons/${sp.id}`, { method: 'DELETE' })
+    await authFetch(`/api/settings/sales-persons/${sp.id}`, { method: 'DELETE' })
     load()
   }
 
   const handleReactivate = async (sp: SalesPerson) => {
-    await fetch(`${API}/api/settings/sales-persons/${sp.id}`, {
-      method:  'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ is_active: true }),
+    await authFetch(`/api/settings/sales-persons/${sp.id}`, {
+      method: 'PUT',
+      body:   JSON.stringify({ is_active: true }),
     })
     load()
   }
