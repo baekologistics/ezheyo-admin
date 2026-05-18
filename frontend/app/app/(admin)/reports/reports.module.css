@@ -84,6 +84,47 @@
   margin-left: auto;
 }
 
+.queryBtn {
+  height: 36px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 7px;
+  background: var(--orange, #F97316);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-end;
+  white-space: nowrap;
+}
+.queryBtn:hover:not(:disabled) { opacity: 0.88; }
+.queryBtn:disabled { opacity: 0.5; cursor: default; }
+
+/* Autocomplete suggestions */
+.suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+  z-index: 100;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.suggestion {
+  padding: 9px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.suggestion:hover { background: var(--surface); }
+.suggestionEmail { font-size: 11px; color: var(--muted); }
+
 /* ── Section (tabs + table) ─────────────────────────────────── */
 .section {
   background: var(--white);
@@ -162,8 +203,10 @@
 
 /* ── Cell styles ────────────────────────────────────────────── */
 .customerName { font-weight: 500; }
+.custEmail    { font-size: 11px; color: var(--muted); margin-top: 1px; }
 .monthCell    { font-weight: 600; white-space: nowrap; }
 .spName       { font-weight: 500; }
+.revCell      { font-weight: 700; }
 
 .spBadge {
   display: inline-block;
@@ -207,6 +250,19 @@
 /* Utility */
 .muted { color: var(--muted); }
 .empty { text-align: center; color: var(--muted); padding: 40px; font-size: 13px; }
+
+/* ── Coming Soon ────────────────────────────────────────────── */
+.comingSoon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 24px;
+  gap: 8px;
+}
+.comingSoonIcon  { font-size: 36px; line-height: 1; }
+.comingSoonTitle { font-size: 16px; font-weight: 600; color: var(--text); }
+.comingSoonSub   { font-size: 13px; color: var(--muted); }
 
 /* ── Responsive ─────────────────────────────────────────────── */
 @media (max-width: 1200px) {

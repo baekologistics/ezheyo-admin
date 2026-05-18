@@ -14,6 +14,8 @@ import settlementsRouter from './routes/settlements'
 import syncRouter        from './routes/sync'
 import settingsRouter    from './routes/settings'
 import requestsRouter   from './routes/requests'
+import dashboardRouter  from './routes/dashboard'
+import reportsRouter   from './routes/reports'
 
 dotenv.config()
 
@@ -36,6 +38,8 @@ app.use('/api/settlements', settlementsRouter)
 app.use('/api/sync',        syncRouter)
 app.use('/api/settings',    settingsRouter)
 app.use('/api/requests',    requestsRouter)
+app.use('/api/dashboard',   dashboardRouter)
+app.use('/api/reports',     reportsRouter)
 
 app.use(errorHandler)
 
