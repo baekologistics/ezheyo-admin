@@ -54,7 +54,7 @@ export function getUser(): AuthUser | null {
 }
 
 // ── Fetch with auth ───────────────────────────────────────────────
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'
 
 export async function authFetch(input: string, init?: RequestInit): Promise<Response> {
   const token = getToken()

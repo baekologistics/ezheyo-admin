@@ -5,7 +5,7 @@ import Image from 'next/image'
 import styles from './login.module.css'
 import { setToken, setUser, authFetch } from '@/lib/auth'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'
 
 type LoginResponse = {
   token: string
