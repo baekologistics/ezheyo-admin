@@ -169,7 +169,7 @@ export default function SettingsPage() {
         return
       }
       setUsers(prev => prev.map(u => u.id === user.id ? { ...u, must_change_password: true } : u))
-      showToast(`${user.display_name} password reset to Ezheyo2024!`)
+      showToast(`${user.display_name} password reset to Ezheyo2023!`)
     } catch {
       showToast('Failed to reset password')
     } finally {
@@ -359,7 +359,7 @@ export default function SettingsPage() {
             <div className={styles.modalBody}>
               <p style={{ fontSize: 14, lineHeight: 1.6, margin: 0 }}>
                 Reset <strong>{confirmReset.display_name}</strong> ({confirmReset.username})
-                password to <code className={styles.codePw}>Ezheyo2024!</code>?
+                password to <code className={styles.codePw}>Ezheyo2023!</code>?
               </p>
               <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10 }}>
                 The user will be required to change their password on next login.

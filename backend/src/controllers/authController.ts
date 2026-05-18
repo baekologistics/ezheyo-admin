@@ -225,7 +225,7 @@ export async function resetUserPassword(
     )
     if (!target.rows[0]) { res.status(404).json({ error: 'User not found' }); return }
 
-    const DEFAULT_PASSWORD = 'Ezheyo2024!'
+    const DEFAULT_PASSWORD = 'Ezheyo2023!'
     const hash = await bcrypt.hash(DEFAULT_PASSWORD, 12)
 
     await pool.query(
