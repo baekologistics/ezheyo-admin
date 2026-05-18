@@ -27,16 +27,25 @@ const TABLES = [
   'customers',
   'orders',
   'settlements',
-  'cod_payments',
   'admin_logs',
 ]
+
+// Columns that are GENERATED ALWAYS AS (...) STORED — must be excluded from INSERT
+const GENERATED_COLUMNS: Record<string, string[]> = {
+  orders: ['profit'],
+}
 
 function sqlLiteral(val: unknown): string {
   if (val === null || val === undefined) return 'NULL'
   if (typeof val === 'boolean')          return val ? 'TRUE' : 'FALSE'
   if (typeof val === 'number')           return String(val)
   if (val instanceof Date)               return `'${val.toISOString()}'`
-  // Escape single quotes
+  // JSON/object → serialize then cast to jsonb
+  if (typeof val === 'object') {
+    const json = JSON.stringify(val).replace(/'/g, "''")
+    return `'${json}'::jsonb`
+  }
+  // Escape single quotes for plain strings
   return `'${String(val).replace(/'/g, "''")}'`
 }
 
@@ -49,8 +58,10 @@ async function exportTable(tableName: string): Promise<number> {
     return 0
   }
 
-  const columns = Object.keys(rows[0])
-  const colList = columns.map(c => `"${c}"`).join(', ')
+  // Exclude GENERATED ALWAYS columns from INSERT
+  const excluded = GENERATED_COLUMNS[tableName] ?? []
+  const columns  = Object.keys(rows[0]).filter(c => !excluded.includes(c))
+  const colList  = columns.map(c => `"${c}"`).join(', ')
 
   const lines: string[] = [
     `-- ${tableName} (${rows.length} rows)`,
@@ -90,7 +101,13 @@ async function main() {
     }
   }
 
-  console.log(`\n✅ Export complete — ${total} total rows across ${TABLES.length} tables\n`)
+  console.log(`\n✅ Export complete — ${total} total rows across ${TABLES.length} tables`)
+  if (Object.keys(GENERATED_COLUMNS).length > 0) {
+    for (const [tbl, cols] of Object.entries(GENERATED_COLUMNS)) {
+      console.log(`   ℹ️  ${tbl}: excluded generated columns [${cols.join(', ')}]`)
+    }
+  }
+  console.log()
   await pool.end()
 }
 
