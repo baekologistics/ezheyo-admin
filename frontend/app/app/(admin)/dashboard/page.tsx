@@ -1,5 +1,6 @@
 'use client'
 import React, { useState, useEffect, useCallback } from 'react'
+import { usePageLog, authFetch } from '@/lib/usePageLog'
 import {
   ComposedChart, Bar, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -7,7 +8,6 @@ import {
 } from 'recharts'
 import styles from './dashboard.module.css'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
 // ── Types ────────────────────────────────────────────────────────
 type Stats = {
@@ -91,6 +91,7 @@ function ChartTooltip({ active, payload, label }: {
 
 // ── Page ─────────────────────────────────────────────────────────
 export default function DashboardPage() {
+  usePageLog('dashboard')
   const [stats,       setStats]       = useState<Stats | null>(null)
   const [chartData,   setChartData]   = useState<MonthRow[]>([])
   const [topCustomers,setTopCustomers]= useState<TopCustomerRow[]>([])
@@ -101,10 +102,10 @@ export default function DashboardPage() {
     setLoading(true)
     try {
       const [sRes, cRes, tcRes, smRes] = await Promise.all([
-        fetch(`${API_URL}/api/dashboard/stats`),
-        fetch(`${API_URL}/api/dashboard/monthly-chart`),
-        fetch(`${API_URL}/api/dashboard/top-customers`),
-        fetch(`${API_URL}/api/settlements/summary`),
+        authFetch('/api/dashboard/stats'),
+        authFetch('/api/dashboard/monthly-chart'),
+        authFetch('/api/dashboard/top-customers'),
+        authFetch('/api/settlements/summary'),
       ])
       const [s, c, tc, sm] = await Promise.all([
         sRes.json()  as Promise<Stats>,

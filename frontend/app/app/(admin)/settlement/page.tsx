@@ -2,9 +2,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import * as XLSX from 'xlsx'
 import styles from './settlement.module.css'
+import { usePageLog, authFetch } from '@/lib/usePageLog'
 
 const HISTORY_START = '2024-12'
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
 
 // ── Types ────────────────────────────────────────────────────────
 type PaymentMethod = 'Zelle' | 'Check' | 'Wire' | 'ACH' | 'Cash' | ''
@@ -523,7 +523,7 @@ function DetailModal({
     if (!editDraft) return
     setSaving(true)
     try {
-      await fetch(`${API_URL}/api/settlements/payments/${editDraft.id}`, {
+      await authFetch(`/api/settlements/payments/${editDraft.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -543,7 +543,7 @@ function DetailModal({
   const handleDelete = async (id: string) => {
     setSaving(true)
     try {
-      await fetch(`${API_URL}/api/settlements/payments/${id}`, { method: 'DELETE' })
+      await authFetch(`/api/settlements/payments/${id}`, { method: 'DELETE' })
       setConfirmDeleteId(null); onReload()
     } catch { /* ignore */ }
     finally { setSaving(false) }
@@ -657,6 +657,7 @@ function DetailModal({
 
 // ── Page ─────────────────────────────────────────────────────────
 export default function SettlementPage() {
+  usePageLog('settlement')
   // ── Core state ────────────────────────────────────────────────
   const [historyRows,   setHistoryRows]   = useState<HistoryRow[]>([])
   const [monthData,     setMonthData]     = useState<MonthData | null>(null)
@@ -680,7 +681,7 @@ export default function SettlementPage() {
   // ── Load summary ─────────────────────────────────────────────
   const loadSummary = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/api/settlements/summary`)
+      const res = await authFetch(`/api/settlements/summary`)
       setSummaryData((await res.json()) as SummaryData)
     } catch { /* ignore */ }
   }, [])
@@ -689,7 +690,7 @@ export default function SettlementPage() {
   const loadHistory = useCallback(async () => {
     setHistLoading(true)
     try {
-      const res  = await fetch(`${API_URL}/api/settlements/history`)
+      const res  = await authFetch(`/api/settlements/history`)
       const data = (await res.json()) as HistoryRow[]
       setHistoryRows(data)
       const visible = data.filter(r => r.month >= HISTORY_START)
@@ -705,7 +706,7 @@ export default function SettlementPage() {
     setMonthLoading(true)
     try {
       const [y, m] = monthStr.split('-')
-      const res  = await fetch(`${API_URL}/api/settlements/month?year=${y}&month=${parseInt(m)}`)
+      const res  = await authFetch(`/api/settlements/month?year=${y}&month=${parseInt(m)}`)
       setMonthData((await res.json()) as MonthData)
     } catch { /* ignore */ }
     finally { setMonthLoading(false) }
@@ -713,7 +714,7 @@ export default function SettlementPage() {
 
   const fetchMonth = useCallback(async (monthStr: string): Promise<MonthData> => {
     const [y, m] = monthStr.split('-')
-    const res = await fetch(`${API_URL}/api/settlements/month?year=${y}&month=${parseInt(m)}`)
+    const res = await authFetch(`/api/settlements/month?year=${y}&month=${parseInt(m)}`)
     return (await res.json()) as MonthData
   }, [])
 
@@ -722,8 +723,8 @@ export default function SettlementPage() {
     if (!from || !to) return
     setRangeLoading(true)
     try {
-      const res = await fetch(
-        `${API_URL}/api/settlements/range?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
+      const res = await authFetch(
+        `/api/settlements/range?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
       )
       setRangeData((await res.json()) as RangeData)
     } catch { /* ignore */ }
@@ -739,7 +740,7 @@ export default function SettlementPage() {
     month: string; recipient_type: 'baeko' | 'sales_person'
     sales_person?: string; amount: number; method: string; paid_date: string; memo?: string
   }) => {
-    const res = await fetch(`${API_URL}/api/settlements/payments`, {
+    const res = await authFetch(`/api/settlements/payments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

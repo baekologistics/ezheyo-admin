@@ -2,8 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import * as XLSX from 'xlsx'
 import styles from './reports.module.css'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'
+import { usePageLog, authFetch } from '@/lib/usePageLog'
 
 // ── Types ──────────────────────────────────────────────────────────
 type TabId = 'customer' | 'salesperson' | 'cod' | 'settlement'
@@ -78,6 +77,7 @@ const TABS: { id: TabId; label: string }[] = [
 
 // ── Page ───────────────────────────────────────────────────────────
 export default function ReportsPage() {
+  usePageLog('reports')
   const [tab, setTab] = useState<TabId>('customer')
 
   // filters
@@ -103,8 +103,8 @@ export default function ReportsPage() {
   // ── Load reference data on mount ──────────────────────────────
   useEffect(() => {
     Promise.all([
-      fetch(`${API_URL}/api/settings/sales-persons`).then(r => r.json()),
-      fetch(`${API_URL}/api/customers?limit=500`).then(r => r.json()),
+      authFetch('/api/settings/sales-persons').then(r => r.json()),
+      authFetch('/api/customers?limit=500').then(r => r.json()),
     ]).then(([sp, cust]) => {
       setSalesPersons(Array.isArray(sp) ? sp : [])
       const arr = Array.isArray(cust) ? cust : (cust?.customers ?? cust?.data ?? [])
@@ -151,9 +151,9 @@ export default function ReportsPage() {
       if (spId)   qs.set('sales_person_id', spId)
 
       const [sumRes, custRes, spRes] = await Promise.all([
-        fetch(`${API_URL}/api/reports/summary?from=${dateFrom}&to=${dateTo}`),
-        fetch(`${API_URL}/api/reports/customer?${qs}`),
-        fetch(`${API_URL}/api/reports/sales-person?from=${dateFrom}&to=${dateTo}`),
+        authFetch(`/api/reports/summary?from=${dateFrom}&to=${dateTo}`),
+        authFetch(`/api/reports/customer?${qs}`),
+        authFetch(`/api/reports/sales-person?from=${dateFrom}&to=${dateTo}`),
       ])
       const [sum, cust, sp] = await Promise.all([
         sumRes.json()  as Promise<SummaryData>,

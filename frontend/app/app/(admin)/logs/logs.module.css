@@ -1,0 +1,161 @@
+.page { display: flex; flex-direction: column; gap: 16px; }
+
+/* ── Filter bar ─────────────────────────────────────────────────── */
+.filterBar {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  flex-wrap: wrap;
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.filterLabel {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.input, .select {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--white);
+  outline: none;
+  font-family: inherit;
+  min-width: 130px;
+}
+.input:focus, .select:focus { border-color: var(--orange); }
+
+.queryBtn {
+  height: 36px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 7px;
+  background: var(--orange, #F97316);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-end;
+  font-family: inherit;
+}
+.queryBtn:hover:not(:disabled) { opacity: 0.88; }
+.queryBtn:disabled { opacity: 0.5; cursor: default; }
+
+.totalCount {
+  font-size: 12px;
+  color: var(--muted);
+  align-self: flex-end;
+  padding-bottom: 2px;
+  margin-left: auto;
+}
+
+/* ── Section ────────────────────────────────────────────────────── */
+.section {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* ── Table ──────────────────────────────────────────────────────── */
+.tableWrap { overflow-x: auto; }
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.table th {
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.table td {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.table tr:last-child td { border-bottom: none; }
+.table tbody tr:hover td { background: var(--surface); }
+
+/* ── Cell types ─────────────────────────────────────────────────── */
+.dateCell   { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.pageCell   { font-size: 12px; color: var(--muted); }
+.detailCell { font-size: 12px; color: var(--muted); max-width: 240px;
+              overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ipCell     { font-family: monospace; font-size: 12px; color: var(--muted); }
+
+.userBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: #EDE9FE;
+  color: #5B21B6;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* ── Action badges ──────────────────────────────────────────────── */
+.actionBadge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.actLogin     { background: #D1FAE5; color: #065F46; }
+.actLogout    { background: #F1F5F9; color: #475569; }
+.actPageView  { background: #EFF6FF; color: #1D4ED8; }
+.actExport    { background: #FEF3C7; color: #92400E; }
+.actPwdChange { background: #FEE2E2; color: #991B1B; }
+.actDefault   { background: var(--surface); color: var(--muted); }
+
+/* ── Utility ────────────────────────────────────────────────────── */
+.muted { color: var(--muted); }
+.empty { text-align: center; color: var(--muted); padding: 40px; font-size: 13px; }
+
+/* ── Pagination ─────────────────────────────────────────────────── */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 14px;
+  border-top: 1px solid var(--border);
+}
+.pageBtn {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--white);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text);
+}
+.pageBtn:hover:not(:disabled) { background: var(--surface); }
+.pageBtn:disabled { opacity: 0.4; cursor: default; }
+.pageInfo { font-size: 13px; color: var(--muted); }

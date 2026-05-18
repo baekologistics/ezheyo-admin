@@ -3,9 +3,14 @@ import cors from 'cors'
 import helmet from 'helmet'
 import dotenv from 'dotenv'
 
+dotenv.config()
+
 import { testConnection } from './config/database'
 import { errorHandler } from './middleware/errorHandler'
+import { authenticateToken, requireRole } from './middleware/auth'
 
+import authRouter        from './routes/auth'
+import logsRouter        from './routes/logs'
 import customersRouter   from './routes/customers'
 import ordersRouter      from './routes/orders'
 import codRouter         from './routes/cod'
@@ -13,33 +18,49 @@ import claimsRouter      from './routes/claims'
 import settlementsRouter from './routes/settlements'
 import syncRouter        from './routes/sync'
 import settingsRouter    from './routes/settings'
-import requestsRouter   from './routes/requests'
-import dashboardRouter  from './routes/dashboard'
-import reportsRouter   from './routes/reports'
+import requestsRouter    from './routes/requests'
+import dashboardRouter   from './routes/dashboard'
+import reportsRouter     from './routes/reports'
 
-dotenv.config()
-
-const app = express()
+const app  = express()
 const PORT = parseInt(process.env.PORT || '4000')
 
 app.use(helmet())
 app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:3000' }))
 app.use(express.json())
 
+// ── Public ────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
+app.use('/api/auth', authRouter)
 
-app.use('/api/customers',   customersRouter)
-app.use('/api/orders',      ordersRouter)
-app.use('/api/cod',         codRouter)
-app.use('/api/claims',      claimsRouter)
-app.use('/api/settlements', settlementsRouter)
-app.use('/api/sync',        syncRouter)
-app.use('/api/settings',    settingsRouter)
-app.use('/api/requests',    requestsRouter)
-app.use('/api/dashboard',   dashboardRouter)
-app.use('/api/reports',     reportsRouter)
+// ── Protected (all roles) ─────────────────────────────────────────
+app.use('/api/customers',  authenticateToken, customersRouter)
+app.use('/api/orders',     authenticateToken, ordersRouter)
+app.use('/api/cod',        authenticateToken, codRouter)
+app.use('/api/claims',     authenticateToken, claimsRouter)
+app.use('/api/sync',       authenticateToken, syncRouter)
+app.use('/api/requests',   authenticateToken, requestsRouter)
+app.use('/api/dashboard',  authenticateToken, dashboardRouter)
+app.use('/api/logs',       logsRouter)   // internal auth per-route
+
+// ── owner1 + owner2 only ──────────────────────────────────────────
+app.use('/api/settlements',
+  authenticateToken,
+  requireRole(['owner1', 'owner2']),
+  settlementsRouter
+)
+app.use('/api/reports',
+  authenticateToken,
+  requireRole(['owner1', 'owner2']),
+  reportsRouter
+)
+app.use('/api/settings',
+  authenticateToken,
+  requireRole(['owner1', 'owner2']),
+  settingsRouter
+)
 
 app.use(errorHandler)
 
@@ -50,7 +71,6 @@ async function main() {
     console.warn('⚠️  Database not connected — continuing without DB')
   }
 
-  // Start cron jobs after DB connection
   try {
     await import('./services/cronService')
   } catch (err) {

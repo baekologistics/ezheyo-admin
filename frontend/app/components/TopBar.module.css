@@ -10,6 +10,52 @@
   top: 0;
   z-index: 50;
 }
+
 .title { font-size: 15px; font-weight: 500; }
-.right { display: flex; align-items: center; gap: 12px; }
-.user { font-size: 13px; color: var(--muted); }
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.displayName {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.roleBadge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.logoutBtn {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--white);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.logoutBtn:hover {
+  background: #FEF2F2;
+  color: #DC2626;
+  border-color: #FECACA;
+}
