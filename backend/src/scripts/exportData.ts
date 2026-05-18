@@ -28,6 +28,12 @@ const TABLES = [
   'orders',
   'settlements',
   'admin_logs',
+  'cod_statements',
+  'cod_records',        // FK → cod_statements, orders, customers
+  'payment_batches',    // FK → customers
+  'customer_sales',     // FK → customers, sales_persons
+  'request_types',      // no FK (must come before customer_requests)
+  'customer_requests',  // FK → request_types, customers
 ]
 
 // Columns that are GENERATED ALWAYS AS (...) STORED — must be excluded from INSERT
