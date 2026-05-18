@@ -13,7 +13,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     const token = getToken()
-    if (!token) { router.replace('/app/login'); return }
+    if (!token) { router.replace('/login'); return }
 
     // Try cached user first so layout renders immediately
     const cached = getUser()
@@ -26,13 +26,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         return r.json() as Promise<AuthUser>
       })
       .then(u => { setUser(u); setUserState(u); setReady(true) })
-      .catch(() => { removeToken(); router.replace('/app/login') })
+      .catch(() => { removeToken(); router.replace('/login') })
   }, [router])
 
   const handleLogout = async () => {
     try { await authFetch('/api/auth/logout', { method: 'POST' }) } catch { /* ignore */ }
     removeToken()
-    router.replace('/app/login')
+    router.replace('/login')
   }
 
   if (!ready) {
