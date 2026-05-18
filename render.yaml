@@ -1,0 +1,65 @@
+services:
+  # ── Backend API ─────────────────────────────────────────────────────
+  - type: web
+    name: ezheyo-admin-api
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: DB_HOST
+        fromDatabase:
+          name: ezheyo-admin-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: ezheyo-admin-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: ezheyo-admin-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: ezheyo-admin-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: ezheyo-admin-db
+          property: password
+      - key: DB_SSL
+        value: true
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      - key: SHIPHEYO_API_URL
+        sync: false
+      - key: SHIPHEYO_AUTH_KEY
+        sync: false
+
+  # ── Frontend ────────────────────────────────────────────────────────
+  - type: web
+    name: ezheyo-admin-frontend
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: frontend/app
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        value: https://ezheyo-admin-api.onrender.com
+
+databases:
+  - name: ezheyo-admin-db
+    databaseName: ezheyo_admin
+    user: ezheyo_admin_user
+    region: oregon
+    plan: free

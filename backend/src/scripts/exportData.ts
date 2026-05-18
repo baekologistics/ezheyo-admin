@@ -1,0 +1,97 @@
+/**
+ * exportData.ts
+ *
+ * Exports all tables as SQL INSERT files to backend/exports/
+ * Usage:  npx ts-node src/scripts/exportData.ts
+ *
+ * Output files (one per table):
+ *   exports/customers.sql
+ *   exports/orders.sql
+ *   exports/settlements.sql
+ *   exports/cod_payments.sql
+ *   exports/sales_persons.sql
+ *   exports/admin_users.sql
+ *   exports/admin_logs.sql
+ */
+
+import fs   from 'fs'
+import path from 'path'
+import { pool } from '../config/database'
+
+const EXPORT_DIR = path.resolve(__dirname, '../../exports')
+
+// Tables to export (order matters for FK constraints)
+const TABLES = [
+  'admin_users',
+  'sales_persons',
+  'customers',
+  'orders',
+  'settlements',
+  'cod_payments',
+  'admin_logs',
+]
+
+function sqlLiteral(val: unknown): string {
+  if (val === null || val === undefined) return 'NULL'
+  if (typeof val === 'boolean')          return val ? 'TRUE' : 'FALSE'
+  if (typeof val === 'number')           return String(val)
+  if (val instanceof Date)               return `'${val.toISOString()}'`
+  // Escape single quotes
+  return `'${String(val).replace(/'/g, "''")}'`
+}
+
+async function exportTable(tableName: string): Promise<number> {
+  const result = await pool.query(`SELECT * FROM ${tableName} ORDER BY 1`)
+  const rows   = result.rows
+
+  if (rows.length === 0) {
+    console.log(`  ${tableName}: 0 rows — skipping`)
+    return 0
+  }
+
+  const columns = Object.keys(rows[0])
+  const colList = columns.map(c => `"${c}"`).join(', ')
+
+  const lines: string[] = [
+    `-- ${tableName} (${rows.length} rows)`,
+    `-- Generated: ${new Date().toISOString()}`,
+    '',
+    `TRUNCATE TABLE "${tableName}" RESTART IDENTITY CASCADE;`,
+    '',
+  ]
+
+  for (const row of rows) {
+    const values = columns.map(c => sqlLiteral(row[c])).join(', ')
+    lines.push(`INSERT INTO "${tableName}" (${colList}) VALUES (${values});`)
+  }
+
+  lines.push('')
+
+  const outPath = path.join(EXPORT_DIR, `${tableName}.sql`)
+  fs.writeFileSync(outPath, lines.join('\n'), 'utf8')
+  console.log(`  ${tableName}: ${rows.length} rows → ${outPath}`)
+  return rows.length
+}
+
+async function main() {
+  // Ensure exports directory exists
+  if (!fs.existsSync(EXPORT_DIR)) {
+    fs.mkdirSync(EXPORT_DIR, { recursive: true })
+  }
+
+  console.log(`\n📦 Exporting database to: ${EXPORT_DIR}\n`)
+
+  let total = 0
+  for (const table of TABLES) {
+    try {
+      total += await exportTable(table)
+    } catch (err) {
+      console.error(`  ⚠ ${table}: ${(err as Error).message}`)
+    }
+  }
+
+  console.log(`\n✅ Export complete — ${total} total rows across ${TABLES.length} tables\n`)
+  await pool.end()
+}
+
+main().catch(err => { console.error(err); process.exit(1) })
