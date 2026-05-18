@@ -145,6 +145,108 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
   }
 }
 
+// ── GET /api/auth/users ───────────────────────────────────────────
+export async function getUsers(
+  _req: Request, res: Response, next: NextFunction
+): Promise<void> {
+  try {
+    const result = await pool.query<{
+      id: string; username: string; display_name: string; role: string
+      must_change_password: boolean; last_login: string | null; created_at: string
+    }>(
+      `SELECT id, username, display_name, role,
+              must_change_password, last_login, created_at
+       FROM admin_users
+       ORDER BY created_at ASC`
+    )
+    res.json(result.rows)
+  } catch (err) {
+    next(err)
+  }
+}
+
+// ── PATCH /api/auth/users/:id/role ────────────────────────────────
+export async function updateUserRole(
+  req: Request, res: Response, next: NextFunction
+): Promise<void> {
+  try {
+    const authUser = req.user
+    if (!authUser) { res.status(401).json({ error: 'Unauthorized' }); return }
+
+    const { id } = req.params
+    const { role } = req.body as { role?: string }
+
+    const validRoles = ['owner1', 'owner2', 'staff']
+    if (!role || !validRoles.includes(role)) {
+      res.status(400).json({ error: 'role must be owner1, owner2, or staff' })
+      return
+    }
+
+    // Prevent changing own role
+    if (id === authUser.userId) {
+      res.status(400).json({ error: 'Cannot change your own role' })
+      return
+    }
+
+    const target = await pool.query<{ username: string }>(
+      'SELECT username FROM admin_users WHERE id = $1', [id]
+    )
+    if (!target.rows[0]) { res.status(404).json({ error: 'User not found' }); return }
+
+    await pool.query(
+      'UPDATE admin_users SET role = $1, updated_at = NOW() WHERE id = $2',
+      [role, id]
+    )
+
+    await writeLog(
+      authUser.userId, authUser.username, 'role_change', 'settings',
+      `Changed role of ${target.rows[0].username} to ${role}`,
+      req
+    )
+
+    res.json({ ok: true, username: target.rows[0].username, role })
+  } catch (err) {
+    next(err)
+  }
+}
+
+// ── POST /api/auth/users/:id/reset-password ───────────────────────
+export async function resetUserPassword(
+  req: Request, res: Response, next: NextFunction
+): Promise<void> {
+  try {
+    const authUser = req.user
+    if (!authUser) { res.status(401).json({ error: 'Unauthorized' }); return }
+
+    const { id } = req.params
+
+    const target = await pool.query<{ username: string }>(
+      'SELECT username FROM admin_users WHERE id = $1', [id]
+    )
+    if (!target.rows[0]) { res.status(404).json({ error: 'User not found' }); return }
+
+    const DEFAULT_PASSWORD = 'Ezheyo2024!'
+    const hash = await bcrypt.hash(DEFAULT_PASSWORD, 12)
+
+    await pool.query(
+      `UPDATE admin_users
+       SET password_hash = $1, must_change_password = true, updated_at = NOW()
+       WHERE id = $2`,
+      [hash, id]
+    )
+
+    await writeLog(
+      authUser.userId, authUser.username, 'password_reset', 'settings',
+      `Reset password of ${target.rows[0].username}`,
+      req
+    )
+
+    res.json({ ok: true, username: target.rows[0].username })
+  } catch (err) {
+    next(err)
+  }
+}
+
 // ── GET /api/auth/me ──────────────────────────────────────────────
 export async function getMe(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {

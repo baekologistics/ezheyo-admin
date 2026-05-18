@@ -119,3 +119,130 @@
 }
 .saveBtn:hover { background: var(--orange-dark); }
 .saveBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── User Management ────────────────────────────────────────────── */
+.mono {
+  font-family: monospace;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.youBadge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 600;
+  background: #EFF6FF;
+  color: #1D4ED8;
+  vertical-align: middle;
+}
+
+/* Role badge (read-only display) */
+.roleBadge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.roleOwner1 { background: #DBEAFE; color: #1D4ED8; }
+.roleOwner2 { background: #FFEDD5; color: #C2410C; }
+.roleStaff  { background: var(--surface); color: var(--muted); }
+
+/* Role select (editable) */
+.roleSelectWrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.roleSelect {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--white);
+  color: var(--text);
+  outline: none;
+  cursor: pointer;
+}
+.roleSelect:focus { border-color: var(--orange); }
+.roleSelect:disabled { opacity: 0.5; cursor: not-allowed; }
+.savingDot { font-size: 13px; color: var(--muted); }
+
+/* Password column */
+.pwCell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mustChange {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 500;
+  background: #FEF3C7;
+  color: #92400E;
+  white-space: nowrap;
+}
+.resetBtn {
+  padding: 4px 12px;
+  border: 1px solid #FECACA;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--white);
+  color: #B91C1C;
+  cursor: pointer;
+}
+.resetBtn:hover:not(:disabled) { background: #FEF2F2; }
+.resetBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Danger button (confirm modal) */
+.dangerBtn {
+  height: 38px;
+  padding: 0 20px;
+  background: #DC2626;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.dangerBtn:hover { background: #B91C1C; }
+
+.codePw {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 13px;
+  font-family: monospace;
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1F2937;
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 9999;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  animation: fadeInUp 0.2s ease;
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
