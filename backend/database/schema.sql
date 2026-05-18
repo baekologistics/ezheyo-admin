@@ -265,3 +265,36 @@ CREATE INDEX IF NOT EXISTS idx_customer_requests_type   ON customer_requests(req
 CREATE INDEX IF NOT EXISTS idx_customer_requests_cust   ON customer_requests(customer_id);
 CREATE INDEX IF NOT EXISTS idx_customer_requests_status ON customer_requests(status);
 CREATE INDEX IF NOT EXISTS idx_customer_requests_date   ON customer_requests(created_at);
+
+-- ─────────────────────────────────────────────────────────────
+-- 14. admin_users
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS admin_users (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  username             VARCHAR NOT NULL UNIQUE,
+  display_name         VARCHAR NOT NULL,
+  password_hash        VARCHAR NOT NULL DEFAULT '',
+  role                 VARCHAR NOT NULL DEFAULT 'staff',  -- 'owner1' | 'owner2' | 'staff'
+  must_change_password BOOLEAN DEFAULT TRUE,
+  last_login           TIMESTAMP,
+  created_at           TIMESTAMP DEFAULT NOW(),
+  updated_at           TIMESTAMP DEFAULT NOW()
+);
+
+-- ─────────────────────────────────────────────────────────────
+-- 15. admin_logs
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS admin_logs (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    UUID REFERENCES admin_users(id),
+  username   VARCHAR,
+  action     VARCHAR NOT NULL,
+  page       VARCHAR,
+  detail     TEXT,
+  ip_address VARCHAR,
+  user_agent TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_logs_user_id   ON admin_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_admin_logs_created_at ON admin_logs(created_at);
