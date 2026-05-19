@@ -367,3 +367,151 @@
 .batchTracking { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .batchTrackLabel { font-size: 11px; color: var(--muted); margin-right: 4px; }
 .batchMeta     { font-size: 12px; color: var(--muted); }
+
+/* ── Tab Navigation ─────────────────────────────────────── */
+.tabNav {
+  display: flex; gap: 4px;
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: 10px; padding: 6px;
+}
+.tabBtn {
+  height: 36px; padding: 0 18px;
+  background: none; border: none; border-radius: 7px;
+  font-size: 13px; font-weight: 500; font-family: inherit;
+  cursor: pointer; color: var(--muted);
+  display: flex; align-items: center; gap: 7px;
+  transition: background 0.12s, color 0.12s;
+}
+.tabBtn:hover { background: var(--surface); color: var(--text); }
+.tabBtnActive {
+  background: var(--orange) !important; color: white !important;
+  font-weight: 600;
+}
+.tabCount {
+  min-width: 20px; height: 20px; padding: 0 6px;
+  background: white; color: var(--orange);
+  border-radius: 10px; font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.tabBtnActive .tabCount { background: rgba(255,255,255,0.25); color: white; }
+
+/* ── Payable Tab: Action buttons per record ─────────────── */
+.payableActions {
+  display: flex; align-items: center; gap: 6px; white-space: nowrap;
+}
+.payPaidBtn {
+  height: 27px; padding: 0 11px;
+  background: #D1FAE5; color: #065F46;
+  border: 1px solid #A7F3D0; border-radius: 5px;
+  font-size: 11px; font-weight: 600; font-family: inherit; cursor: pointer;
+}
+.payPaidBtn:hover:not(:disabled) { background: #059669; color: white; border-color: #059669; }
+.payPaidBtn:disabled { opacity: 0.55; cursor: default; }
+.payReturnBtn {
+  height: 27px; padding: 0 11px;
+  background: var(--surface); color: var(--muted);
+  border: 1px solid var(--border); border-radius: 5px;
+  font-size: 11px; font-weight: 500; font-family: inherit; cursor: pointer;
+}
+.payReturnBtn:hover:not(:disabled) { background: #FEF2F2; color: #991B1B; border-color: #FCA5A5; }
+.payReturnBtn:disabled { opacity: 0.55; cursor: default; }
+
+/* ── Payment method badge ───────────────────────────────── */
+.payMethodBadge {
+  display: inline-block; padding: 2px 8px; border-radius: 20px;
+  font-size: 11px; font-weight: 500; white-space: nowrap;
+}
+.payMethodQb    { background: #DBEAFE; color: #1E40AF; }
+.payMethodZelle { background: #F3E8FF; color: #7C3AED; }
+
+/* ── Mark All Paid button ───────────────────────────────── */
+.markAllPaidBtn {
+  height: 32px; padding: 0 14px;
+  background: var(--orange); color: white;
+  border: none; border-radius: 7px;
+  font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer;
+}
+.markAllPaidBtn:hover { background: var(--orange-dark); }
+
+/* ── Batch list (new card rows) ─────────────────────────── */
+.batchList { display: flex; flex-direction: column; }
+.batchCardRow {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.batchCardRow:last-child { border-bottom: none; }
+.batchCardRow:hover { background: #FAFAFA; }
+.batchCardMain { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.batchCardName { font-size: 14px; font-weight: 600; color: var(--text); }
+.batchCardMeta {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--muted);
+}
+.batchDot { color: var(--border); }
+.batchCardRight {
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+}
+.batchStatusBadge {
+  display: inline-block; padding: 3px 10px; border-radius: 20px;
+  font-size: 11px; font-weight: 600;
+}
+.batchStatusPaid    { background: #D1FAE5; color: #065F46; }
+.batchStatusPending { background: #FEF3C7; color: #92400E; }
+.batchAmt {
+  font-size: 15px; font-weight: 700; color: var(--text);
+}
+.markBatchPaidBtn {
+  height: 30px; padding: 0 13px;
+  background: var(--orange-light); color: var(--orange);
+  border: 1px solid var(--orange); border-radius: 6px;
+  font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer;
+}
+.markBatchPaidBtn:hover:not(:disabled) { background: var(--orange); color: white; }
+.markBatchPaidBtn:disabled { opacity: 0.55; cursor: default; }
+
+/* ── New Batch Modal: statement checklist ───────────────── */
+.stmtCheckList {
+  display: flex; flex-direction: column; gap: 4px;
+  border: 1px solid var(--border); border-radius: 8px;
+  overflow: hidden; max-height: 240px; overflow-y: auto;
+}
+.stmtCheckRow {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 14px; cursor: pointer;
+  font-size: 13px; border-bottom: 1px solid var(--border);
+}
+.stmtCheckRow:last-child { border-bottom: none; }
+.stmtCheckRow:hover { background: var(--surface); }
+.stmtCheckRow input[type='checkbox'] { cursor: pointer; }
+.batchPreview {
+  padding: 10px 14px; background: var(--surface);
+  border-radius: 8px; font-size: 13px; color: var(--muted);
+}
+
+/* ── Textarea ───────────────────────────────────────────── */
+.textarea {
+  width: 100%; padding: 9px 10px;
+  border: 1px solid var(--border); border-radius: 7px;
+  font-size: 13px; color: var(--text); background: var(--white);
+  outline: none; font-family: inherit; resize: vertical;
+  box-sizing: border-box;
+}
+.textarea:focus { border-color: var(--orange); }
+
+/* ── Danger button ──────────────────────────────────────── */
+.dangerBtn {
+  height: 38px; padding: 0 20px;
+  background: #EF4444; color: white;
+  border: none; border-radius: 8px;
+  font-size: 13px; font-family: inherit; cursor: pointer;
+}
+.dangerBtn:hover:not(:disabled) { background: #DC2626; }
+
+/* ── Confirm box ────────────────────────────────────────── */
+.confirmBox {
+  padding: 14px 16px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 10px;
+}
+.confirmName   { font-size: 15px; font-weight: 600; color: var(--text); }
+.confirmDetail { font-size: 13px; color: var(--muted); margin-top: 4px; }
