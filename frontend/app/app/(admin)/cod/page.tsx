@@ -23,6 +23,7 @@ type PayableRecord = {
   cod_amount: number; check_amount: number; check_no: string
   pickup_date: string; delivery_date: string
   statement_no: string; statement_date: string
+  localStatus?: 'collected' | 'paid' | 'returned'   // UI-only undo state
 }
 type PayableCustomer = {
   customer_id: string; customer_name: string; customer_email: string
@@ -147,12 +148,17 @@ export default function CodPage() {
     }
   }, [showToast])
 
-  const removeRecord = useCallback((recordId: string) => {
-    setPayable(prev =>
-      prev.map(c => ({ ...c, records: c.records.filter(r => r.id !== recordId) }))
-          .filter(c => c.records.length > 0)
-    )
-  }, [])
+  // Update a single record's local UI status (collected / paid / returned) without refetching
+  const updateLocalStatus = useCallback(
+    (recordId: string, status: PayableRecord['localStatus']) => {
+      setPayable(prev =>
+        prev.map(c => ({
+          ...c,
+          records: c.records.map(r => r.id === recordId ? { ...r, localStatus: status } : r),
+        }))
+      )
+    }, []
+  )
 
   const markRecordPaid = useCallback(async (record: PayableRecord) => {
     setProcessingIds(prev => new Set(prev).add(record.id))
@@ -162,14 +168,14 @@ export default function CodPage() {
         body:   JSON.stringify({ cod_status: 'paid' }),
       })
       if (!res.ok) { showToast('Failed to mark paid'); return }
-      removeRecord(record.id)
+      updateLocalStatus(record.id, 'paid')
       showToast(`✓ ${record.tracking_no} marked as paid`)
     } catch {
       showToast('Network error')
     } finally {
       setProcessingIds(prev => { const n = new Set(prev); n.delete(record.id); return n })
     }
-  }, [showToast, removeRecord])
+  }, [showToast, updateLocalStatus])
 
   const handleReturn = async () => {
     if (!returning) return
@@ -180,7 +186,7 @@ export default function CodPage() {
         body:   JSON.stringify({ cod_status: 'returned', returned_reason: returnReason }),
       })
       if (!res.ok) { showToast('Failed to mark returned'); return }
-      removeRecord(returning.id)
+      updateLocalStatus(returning.id, 'returned')
       showToast(`↩ ${returning.tracking_no} marked as returned`)
       setReturning(null); setReturnReason('')
     } catch {
@@ -192,16 +198,38 @@ export default function CodPage() {
 
   const markAllPaid = async (customer: PayableCustomer) => {
     setConfirmAllPaid(null)
-    for (const r of customer.records) {
+    // Only process records that are still in collected state
+    const pending = customer.records.filter(r => !r.localStatus || r.localStatus === 'collected')
+    for (const r of pending) {
       await markRecordPaid(r)
     }
   }
 
+  const undoRecordStatus = useCallback(async (record: PayableRecord) => {
+    setProcessingIds(prev => new Set(prev).add(record.id))
+    try {
+      const res = await authFetch(`/api/cod/records/${record.id}/status`, {
+        method: 'PATCH',
+        body:   JSON.stringify({ cod_status: 'collected' }),
+      })
+      if (!res.ok) { showToast('Failed to undo'); return }
+      updateLocalStatus(record.id, 'collected')
+      showToast(`↺ ${record.tracking_no} restored to collected`)
+    } catch {
+      showToast('Network error')
+    } finally {
+      setProcessingIds(prev => { const n = new Set(prev); n.delete(record.id); return n })
+    }
+  }, [showToast, updateLocalStatus])
+
+  const isCollected = (r: PayableRecord) => !r.localStatus || r.localStatus === 'collected'
+
   const payableStats = useMemo(() => ({
-    count:     payable.reduce((a, c) => a + c.records.length, 0),
-    amount:    payable.reduce((a, c) => a + Number(c.total_check_amount), 0),
-    customers: payable.length,
-  }), [payable])
+    count:     payable.reduce((a, c) => a + c.records.filter(isCollected).length, 0),
+    amount:    payable.reduce((a, c) =>
+                 a + c.records.filter(isCollected).reduce((s, r) => s + Number(r.check_amount), 0), 0),
+    customers: payable.filter(c => c.records.some(isCollected)).length,
+  }), [payable])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // ═══ TAB 3: Batch state ══════════════════════════════════════
   const [batches,        setBatches]       = useState<Batch[]>([])
@@ -262,6 +290,20 @@ export default function CodPage() {
       if (!res.ok) { showToast('Failed'); return }
       setBatches(prev => prev.map(b => b.id === batch.id ? { ...b, status: 'paid' } : b))
       showToast(`✓ Batch marked as paid`)
+    } catch {
+      showToast('Network error')
+    } finally {
+      setMarkingId(null)
+    }
+  }
+
+  const undoBatchPaid = async (batch: Batch) => {
+    setMarkingId(batch.id)
+    try {
+      const res = await authFetch(`/api/cod/batches/${batch.id}/undo-paid`, { method: 'PATCH' })
+      if (!res.ok) { showToast('Failed to undo batch'); return }
+      setBatches(prev => prev.map(b => b.id === batch.id ? { ...b, status: 'pending', paid_date: null } : b))
+      showToast(`↺ Batch payment undone`)
     } catch {
       showToast('Network error')
     } finally {
@@ -466,7 +508,7 @@ export default function CodPage() {
                       </thead>
                       <tbody>
                         {customer.records.map(r => (
-                          <tr key={r.id}>
+                          <tr key={r.id} className={r.localStatus === 'paid' ? styles.rowPaid : r.localStatus === 'returned' ? styles.rowReturned : undefined}>
                             <td className={styles.tracking}>{r.tracking_no}</td>
                             <td className={styles.mono}>{r.statement_no}</td>
                             <td className={styles.muted}>{fmtDate(r.pickup_date)}</td>
@@ -474,20 +516,46 @@ export default function CodPage() {
                             <td className={`${styles.bold} ${styles.thRight}`}>{fmt(r.cod_amount)}</td>
                             <td className={`${styles.bold} ${styles.thRight}`}>{fmt(r.check_amount)}</td>
                             <td className={styles.payableActions}>
-                              <button
-                                className={styles.payPaidBtn}
-                                disabled={processingIds.has(r.id)}
-                                onClick={() => markRecordPaid(r)}
-                              >
-                                {processingIds.has(r.id) ? '…' : 'Mark Paid'}
-                              </button>
-                              <button
-                                className={styles.payReturnBtn}
-                                disabled={processingIds.has(r.id)}
-                                onClick={() => { setReturning(r); setReturnReason('') }}
-                              >
-                                Return
-                              </button>
+                              {isCollected(r) ? (
+                                <>
+                                  <button
+                                    className={styles.payPaidBtn}
+                                    disabled={processingIds.has(r.id)}
+                                    onClick={() => markRecordPaid(r)}
+                                  >
+                                    {processingIds.has(r.id) ? '…' : 'Mark Paid'}
+                                  </button>
+                                  <button
+                                    className={styles.payReturnBtn}
+                                    disabled={processingIds.has(r.id)}
+                                    onClick={() => { setReturning(r); setReturnReason('') }}
+                                  >
+                                    Return
+                                  </button>
+                                </>
+                              ) : r.localStatus === 'paid' ? (
+                                <>
+                                  <span className={styles.recordStatusPaid}>✓ Paid</span>
+                                  <button
+                                    className={styles.undoBtn}
+                                    disabled={processingIds.has(r.id)}
+                                    onClick={() => undoRecordStatus(r)}
+                                  >
+                                    {processingIds.has(r.id) ? '…' : 'Undo'}
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <span className={styles.recordStatusReturned}>↩ Returned</span>
+                                  <button
+                                    className={styles.undoBtn}
+                                    disabled={processingIds.has(r.id)}
+                                    onClick={() => undoRecordStatus(r)}
+                                  >
+                                    {processingIds.has(r.id) ? '…' : 'Undo'}
+                                  </button>
+                                </>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -543,7 +611,15 @@ export default function CodPage() {
                       {b.status === 'paid' ? '✓ Paid' : 'Pending'}
                     </span>
                     <span className={styles.batchAmt}>{fmt(b.total_amount)}</span>
-                    {b.status !== 'paid' && (
+                    {b.status === 'paid' ? (
+                      <button
+                        className={styles.undoBatchBtn}
+                        disabled={markingId === b.id}
+                        onClick={() => undoBatchPaid(b)}
+                      >
+                        {markingId === b.id ? '…' : 'Undo Paid'}
+                      </button>
+                    ) : (
                       <button
                         className={styles.markBatchPaidBtn}
                         disabled={markingId === b.id}

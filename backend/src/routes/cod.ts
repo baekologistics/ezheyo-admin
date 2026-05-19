@@ -5,7 +5,7 @@ import {
   getRecords, updateRecord, updateRecordStatus,
   sendEmail, createQbBill,
   getPayable, getPaidHistory,
-  createBatch, getBatches, markBatchPaid,
+  createBatch, getBatches, markBatchPaid, undoBatchPaid,
 } from '../controllers/codController'
 
 const router = Router()
@@ -39,6 +39,7 @@ router.get('/paid-history',           getPaidHistory)
 // ── Batches ───────────────────────────────────────────────────
 router.post('/batches',               createBatch)
 router.get('/batches',                getBatches)
-router.patch('/batches/:id/mark-paid',markBatchPaid)
+router.patch('/batches/:id/mark-paid', markBatchPaid)
+router.patch('/batches/:id/undo-paid', undoBatchPaid)
 
 export default router

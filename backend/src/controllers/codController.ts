@@ -194,14 +194,18 @@ export async function updateRecordStatus(req: Request, res: Response, next: Next
     const values:  unknown[]  = [cod_status]
 
     if (cod_status === 'paid') {
-      setCols.push('paid_date = NOW()', 'paid = true')
+      setCols.push('paid_date = NOW()', 'paid = true', 'returned = false')
     }
     if (cod_status === 'returned') {
-      setCols.push('returned = true')
+      setCols.push('returned = true', 'paid = false', 'paid_date = NULL')
       if (returned_reason) {
         values.push(returned_reason)
         setCols.push(`returned_reason = $${values.length}`)
       }
+    }
+    if (cod_status === 'collected' || cod_status === 'pending') {
+      // Undo paid or returned → clear all payment/return flags
+      setCols.push('paid = false', 'paid_date = NULL', 'returned = false', 'returned_reason = NULL')
     }
     if (payment_method && (payment_method === 'qb_bill' || payment_method === 'zelle')) {
       values.push(payment_method)
@@ -423,6 +427,43 @@ export async function markBatchPaid(req: Request, res: Response, next: NextFunct
     await client.query(
       `UPDATE cod_records
        SET cod_status = 'paid', paid_date = NOW(), paid = true, updated_at = NOW()
+       WHERE batch_id = $1`,
+      [id]
+    )
+
+    await client.query('COMMIT')
+    res.json({ ok: true, batch: batchResult.rows[0] })
+  } catch (err) {
+    await client.query('ROLLBACK')
+    next(err)
+  } finally {
+    client.release()
+  }
+}
+
+// ── PATCH /api/cod/batches/:id/undo-paid ─────────────────────
+export async function undoBatchPaid(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const { id } = req.params
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+
+    const batchResult = await client.query(
+      `UPDATE payment_batches
+       SET status = 'pending', paid_date = NULL
+       WHERE id = $1 AND status = 'paid'
+       RETURNING *`,
+      [id]
+    )
+    if (batchResult.rowCount === 0) {
+      await client.query('ROLLBACK')
+      res.status(404).json({ error: 'Batch not found or not in paid state' }); return
+    }
+
+    // Restore all records in batch back to collected
+    await client.query(
+      `UPDATE cod_records
+       SET cod_status = 'collected', paid = false, paid_date = NULL, updated_at = NOW()
        WHERE batch_id = $1`,
       [id]
     )
