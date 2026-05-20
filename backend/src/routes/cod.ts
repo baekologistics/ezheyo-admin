@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import multer from 'multer'
 import {
-  getStatements, uploadStatement, createStatement,
+  getStatements, uploadStatement, createStatement, deleteStatement,
   getRecords, updateRecord, updateRecordStatus,
   sendEmail, createQbBill,
   getWeeklyPayments, getPayable, getPaidHistory,
@@ -24,6 +24,7 @@ const upload = multer({
 router.get('/statements',             getStatements)
 router.post('/statements/upload',     upload.single('file'), uploadStatement)
 router.post('/statements',            createStatement)          // legacy stub
+router.delete('/statements/:id',      deleteStatement)
 
 // ── Records ───────────────────────────────────────────────────
 router.get('/records',                getRecords)

@@ -685,3 +685,21 @@
 .recStatusPaid      { background: #DBEAFE; color: #1E40AF; }
 .recStatusReturned  { background: #FEE2E2; color: #991B1B; }
 .recStatusPending   { background: #F3F4F6; color: #6B7280; }
+
+/* ── Statement delete button (shown when rows selected) ─────── */
+.stmtDeleteBtn {
+  height: 34px; padding: 0 14px;
+  background: #FEF2F2; color: #991B1B;
+  border: 1px solid #FCA5A5; border-radius: 7px;
+  font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; white-space: nowrap;
+}
+.stmtDeleteBtn:hover { background: #EF4444; color: white; border-color: #EF4444; }
+
+/* ── Delete confirm warning list ────────────────────────────── */
+.deleteWarningList {
+  margin: 0; padding: 0 0 0 18px;
+  display: flex; flex-direction: column; gap: 6px;
+  font-size: 13px; color: var(--text); line-height: 1.5;
+}
+.deleteWarningList li:first-child { color: #991B1B; font-weight: 500; }
+.deleteWarningList li:last-child  { color: #059669; }

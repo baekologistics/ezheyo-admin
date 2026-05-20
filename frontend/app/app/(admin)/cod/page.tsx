@@ -90,10 +90,12 @@ export default function CodPage() {
   }, [])
 
   // ═══ TAB 1: Statements ═══════════════════════════════════════════
-  const [statements,   setStatements]  = useState<CodStatement[]>([])
-  const [loadingStmts, setLoadingStmts] = useState(true)
-  const [uploading,    setUploading]   = useState(false)
-  const [showAllStmts, setShowAllStmts] = useState(false)
+  const [statements,    setStatements]  = useState<CodStatement[]>([])
+  const [loadingStmts,  setLoadingStmts] = useState(true)
+  const [uploading,     setUploading]   = useState(false)
+  const [showAllStmts,  setShowAllStmts] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [deleting,      setDeleting]    = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const loadStatements = useCallback(async () => {
@@ -131,6 +133,36 @@ export default function CodPage() {
       showToast(`Upload error: ${(err as Error).message}`)
     } finally {
       setUploading(false)
+    }
+  }
+
+  const handleDeleteStatements = async () => {
+    if (selectedStmtIds.size === 0) return
+    setDeleting(true)
+    let totalDeleted = 0, totalRestored = 0, failed = 0
+    try {
+      for (const id of Array.from(selectedStmtIds)) {
+        const res = await authFetch(`/api/cod/statements/${id}`, { method: 'DELETE' })
+        if (res.ok) {
+          const data = await res.json() as { deletedRecords: number; restoredToPending: number }
+          totalDeleted  += data.deletedRecords
+          totalRestored += data.restoredToPending
+        } else {
+          failed++
+        }
+      }
+      const msg = failed > 0
+        ? `일부 삭제 실패 (${failed}건). ${totalDeleted} records 삭제 완료.`
+        : `✓ ${selectedStmtIds.size}개 Statement 삭제 · ${totalDeleted} records · ${totalRestored}건 Pending 복원`
+      showToast(msg)
+      setSelectedStmtIds(new Set())
+      setStmtRecords([])
+      setDeleteConfirm(false)
+      await loadStatements()
+    } catch {
+      showToast('삭제 중 오류가 발생했습니다')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -375,6 +407,11 @@ export default function CodPage() {
               <button className={styles.showAllToggle} onClick={() => setShowAllStmts(p => !p)}>
                 {showAllStmts ? 'Active Only' : 'Show All'}
               </button>
+              {selectedStmtIds.size > 0 && (
+                <button className={styles.stmtDeleteBtn} onClick={() => setDeleteConfirm(true)}>
+                  🗑 Delete ({selectedStmtIds.size})
+                </button>
+              )}
               <button className={styles.btnUpload} disabled={uploading} onClick={() => fileInputRef.current?.click()}>
                 {uploading ? 'Uploading…' : '+ Upload PDF'}
               </button>
@@ -745,6 +782,48 @@ export default function CodPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+      {/* ── Delete Statement Confirm Modal ───────────────────────── */}
+      {deleteConfirm && (
+        <div className={styles.overlay} onClick={() => !deleting && setDeleteConfirm(false)}>
+          <div className={styles.modal} style={{ maxWidth: 440 }} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <div>
+                <div className={styles.modalTitle}>
+                  Statement {selectedStmtIds.size > 1 ? `${selectedStmtIds.size}개` : ''} 삭제
+                </div>
+                <div className={styles.modalSub}>이 작업은 되돌릴 수 없습니다</div>
+              </div>
+              <button className={styles.closeBtn} disabled={deleting} onClick={() => setDeleteConfirm(false)}>✕</button>
+            </div>
+            <div className={styles.modalBody}>
+              <div className={styles.confirmBox}>
+                <div className={styles.confirmName}>
+                  {selectedStmtIds.size}개 Statement 삭제
+                </div>
+                <div className={styles.confirmDetail}>
+                  {Array.from(selectedStmtIds)
+                    .map(id => statements.find(s => s.id === id)?.statementNo)
+                    .filter(Boolean)
+                    .join(', ')}
+                </div>
+              </div>
+              <ul className={styles.deleteWarningList}>
+                <li>선택한 Statement와 파싱된 COD Records가 삭제됩니다.</li>
+                <li>해당 Tracking의 COD Status는 Pending으로 복원됩니다.</li>
+                <li>Shipment 기록(날짜, 금액, 고객 등)은 영향받지 않습니다.</li>
+              </ul>
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={styles.cancelBtn} disabled={deleting} onClick={() => setDeleteConfirm(false)}>
+                취소
+              </button>
+              <button className={styles.dangerBtn} disabled={deleting} onClick={handleDeleteStatements}>
+                {deleting ? '삭제 중…' : '삭제'}
+              </button>
+            </div>
           </div>
         </div>
       )}

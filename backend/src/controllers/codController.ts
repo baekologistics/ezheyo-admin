@@ -127,6 +127,58 @@ export async function createStatement(_req: Request, res: Response): Promise<voi
   res.status(400).json({ error: 'Use POST /api/cod/statements/upload with a PDF file' })
 }
 
+// ── DELETE /api/cod/statements/:id ───────────────────────────
+// 1. Save tracking_nos before deletion
+// 2. Delete cod_statements → cascades to cod_records → payment_batch_records
+// 3. Restore orders.cod_status = 'pending' for all affected tracking_nos
+// NOTE: Shipment data (dates, amounts, customer) is never touched.
+export async function deleteStatement(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const { id } = req.params
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+
+    // 1. Collect tracking_nos before cascade-delete wipes cod_records
+    const trackResult = await client.query<{ tracking_no: string }>(
+      `SELECT tracking_no FROM cod_records
+       WHERE cod_statement_id = $1 AND tracking_no IS NOT NULL`,
+      [id]
+    )
+    const trackingNos  = trackResult.rows.map(r => r.tracking_no)
+    const deletedCount = trackResult.rowCount ?? 0
+
+    // 2. Delete cod_statement → CASCADE removes cod_records + payment_batch_records
+    const stmtResult = await client.query(
+      `DELETE FROM cod_statements WHERE id = $1`,
+      [id]
+    )
+    if (stmtResult.rowCount === 0) {
+      await client.query('ROLLBACK')
+      res.status(404).json({ error: 'Statement not found' }); return
+    }
+
+    // 3. Restore orders.cod_status → 'pending' (only COD status; no other fields touched)
+    let restoredToPending = 0
+    if (trackingNos.length > 0) {
+      const restoreResult = await client.query(
+        `UPDATE orders
+         SET cod_status = 'pending'
+         WHERE tracking_no = ANY($1::text[])`,
+        [trackingNos]
+      )
+      restoredToPending = restoreResult.rowCount ?? 0
+    }
+
+    await client.query('COMMIT')
+    res.json({ success: true, deletedRecords: deletedCount, restoredToPending })
+  } catch (err) {
+    await client.query('ROLLBACK')
+    next(err)
+  } finally {
+    client.release()
+  }
+}
+
 // ── GET /api/cod/records ─────────────────────────────────────
 export async function getRecords(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
