@@ -240,32 +240,35 @@ export async function updateRecordStatus(req: Request, res: Response, next: Next
 }
 
 // ── GET /api/cod/payable ─────────────────────────────────────
+// Returns all collected (unpaid) records grouped by customer.
+// batch_id IS NULL was removed: records in a pending batch are still
+// payable; cod_status='collected' is the single source of truth.
 export async function getPayable(_req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const result = await pool.query(`
       SELECT
-        c.id                   AS customer_id,
-        c.name                 AS customer_name,
-        c.email                AS customer_email,
-        c.cod_payment_method,
-        COUNT(cr.id)           AS record_count,
-        SUM(cr.check_amount)   AS total_check_amount,
+        c.id                                  AS customer_id,
+        c.name                                AS customer_name,
+        c.email                               AS customer_email,
+        COALESCE(c.cod_payment_method, 'qb_bill') AS cod_payment_method,
+        COUNT(cr.id)                          AS record_count,
+        SUM(cr.check_amount)                  AS total_check_amount,
         json_agg(json_build_object(
-          'id',           cr.id,
-          'tracking_no',  cr.tracking_no,
-          'cod_amount',   cr.cod_amount,
-          'check_amount', cr.check_amount,
-          'check_no',     cr.check_no,
-          'pickup_date',  cr.pickup_date,
-          'delivery_date',cr.delivery_date,
-          'statement_no', s.statement_no,
-          'statement_date', s.statement_date
-        ) ORDER BY cr.pickup_date ASC) AS records
+          'id',            cr.id,
+          'tracking_no',   cr.tracking_no,
+          'cod_amount',    cr.cod_amount,
+          'check_amount',  cr.check_amount,
+          'check_no',      cr.check_no,
+          'pickup_date',   cr.pickup_date,
+          'delivery_date', cr.delivery_date,
+          'statement_no',  COALESCE(s.statement_no, ''),
+          'statement_date',s.statement_date
+        ) ORDER BY cr.pickup_date ASC NULLS LAST) AS records
       FROM cod_records cr
-      JOIN customers      c ON cr.customer_id      = c.id
-      JOIN cod_statements s ON cr.cod_statement_id = s.id
-      WHERE cr.cod_status = 'collected'
-        AND cr.batch_id IS NULL
+      JOIN  customers      c ON cr.customer_id      = c.id
+      LEFT JOIN cod_statements s ON cr.cod_statement_id = s.id
+      WHERE cr.cod_status        = 'collected'
+        AND cr.customer_id IS NOT NULL
       GROUP BY c.id, c.name, c.email, c.cod_payment_method
       ORDER BY c.name ASC
     `)
