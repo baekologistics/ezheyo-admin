@@ -542,3 +542,123 @@
 .recordStatusReturned {
   font-size: 11px; font-weight: 500; color: var(--muted); white-space: nowrap;
 }
+
+/* ── Weekly Payments Tab ────────────────────────────────────── */
+.weekNav {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 20px;
+}
+.weekNavFields {
+  display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap;
+}
+.weekNavField {
+  display: flex; flex-direction: column; gap: 5px;
+}
+.weekNavLabel {
+  font-size: 11px; font-weight: 500; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.weekNavSep {
+  font-size: 16px; color: var(--muted); padding-bottom: 6px;
+}
+.weekDateInput {
+  height: 36px; padding: 0 10px;
+  border: 1px solid var(--border); border-radius: 7px;
+  font-size: 13px; font-family: inherit; color: var(--text);
+  background: var(--white); outline: none;
+}
+.weekDateInput:focus { border-color: var(--orange); }
+.weekLoadBtn {
+  height: 36px; padding: 0 20px;
+  background: var(--orange); color: white;
+  border: none; border-radius: 7px;
+  font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer;
+  white-space: nowrap;
+}
+.weekLoadBtn:hover:not(:disabled) { background: var(--orange-dark); }
+.weekLoadBtn:disabled { opacity: 0.6; cursor: default; }
+
+/* Bulk action bar */
+.bulkActions {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 16px;
+}
+
+/* Weekly customer cards */
+.weeklyCards { display: flex; flex-direction: column; gap: 12px; }
+
+.weekCard {
+  background: var(--white); border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden;
+}
+
+.weekCardHeader {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; padding: 14px 20px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.weekCardInfo {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  min-width: 0;
+}
+.weekCardName {
+  font-size: 14px; font-weight: 600; color: var(--text); white-space: nowrap;
+}
+.weekCardEmail {
+  font-size: 12px; color: var(--muted); white-space: nowrap;
+}
+.methodToggleHint {
+  font-size: 9px; opacity: 0.6; margin-left: 1px;
+}
+
+.weekCardRight {
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap;
+}
+.weekCardAmount {
+  font-size: 16px; font-weight: 700; color: var(--text);
+}
+.weekCardActions {
+  display: flex; align-items: center; gap: 6px;
+}
+
+/* Per-customer action buttons */
+.cardEmailBtn {
+  height: 30px; padding: 0 11px;
+  background: var(--white); color: var(--muted);
+  border: 1px solid var(--border); border-radius: 6px;
+  font-size: 12px; font-family: inherit; cursor: pointer; white-space: nowrap;
+}
+.cardEmailBtn:hover { background: #EFF6FF; color: #1E40AF; border-color: #BFDBFE; }
+
+.cardQbBtn {
+  height: 30px; padding: 0 11px;
+  background: var(--white); color: var(--muted);
+  border: 1px solid var(--border); border-radius: 6px;
+  font-size: 12px; font-family: inherit; cursor: pointer; white-space: nowrap;
+}
+.cardQbBtn:hover { background: #EFF6FF; color: #1E40AF; border-color: #BFDBFE; }
+
+.cardMarkPaidBtn {
+  height: 30px; padding: 0 13px;
+  background: var(--orange); color: white;
+  border: none; border-radius: 6px;
+  font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer; white-space: nowrap;
+}
+.cardMarkPaidBtn:hover { background: var(--orange-dark); }
+
+.allPaidBadge {
+  font-size: 12px; font-weight: 600; color: #059669;
+  background: #D1FAE5; padding: 4px 10px; border-radius: 20px;
+}
+
+/* Per-record Mark Paid button */
+.recMarkPaidBtn {
+  height: 26px; padding: 0 10px;
+  background: #D1FAE5; color: #065F46;
+  border: 1px solid #A7F3D0; border-radius: 5px;
+  font-size: 11px; font-weight: 600; font-family: inherit; cursor: pointer; white-space: nowrap;
+}
+.recMarkPaidBtn:hover:not(:disabled) { background: #059669; color: white; border-color: #059669; }
+.recMarkPaidBtn:disabled { opacity: 0.55; cursor: default; }

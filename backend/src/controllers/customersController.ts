@@ -30,7 +30,7 @@ export async function getCustomers(_req: Request, res: Response, next: NextFunct
 }
 
 // Only admin-editable fields; sync-managed fields are read-only here
-const ALLOWED_UPDATE_FIELDS = new Set(['sales_person', 'memo', 'status', 'phone'])
+const ALLOWED_UPDATE_FIELDS = new Set(['sales_person', 'memo', 'status', 'phone', 'cod_payment_method'])
 
 // ── PATCH /api/customers/:id ─────────────────────────────────
 export async function updateCustomer(req: Request, res: Response, next: NextFunction): Promise<void> {

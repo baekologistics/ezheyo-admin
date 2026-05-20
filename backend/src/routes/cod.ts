@@ -4,7 +4,7 @@ import {
   getStatements, uploadStatement, createStatement,
   getRecords, updateRecord, updateRecordStatus,
   sendEmail, createQbBill,
-  getPayable, getPaidHistory,
+  getWeeklyPayments, getPayable, getPaidHistory,
   createBatch, getBatches, markBatchPaid, undoBatchPaid,
 } from '../controllers/codController'
 
@@ -31,6 +31,9 @@ router.patch('/records/:id',          updateRecord)
 router.patch('/records/:id/status',   updateRecordStatus)
 router.post('/records/:id/email',     sendEmail)               // stub
 router.post('/records/:id/qb-bill',   createQbBill)            // stub
+
+// ── Weekly Payments ────────────────────────────────────────────
+router.get('/weekly-payments',        getWeeklyPayments)
 
 // ── Payable & Paid History ─────────────────────────────────────
 router.get('/payable',                getPayable)
