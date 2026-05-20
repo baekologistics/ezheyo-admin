@@ -662,3 +662,26 @@
 }
 .recMarkPaidBtn:hover:not(:disabled) { background: #059669; color: white; border-color: #059669; }
 .recMarkPaidBtn:disabled { opacity: 0.55; cursor: default; }
+
+/* ── Statement Records Preview (Statements tab) ─────────────── */
+.stmtRecordsSection {
+  border-top: 2px solid var(--border);
+}
+.stmtRecordsSectionHeader {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 20px 10px; background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+.stmtRecordsSectionTitle {
+  font-size: 13px; font-weight: 600; color: var(--text);
+}
+
+/* Status badges for records in statement preview */
+.recStatusBadge {
+  display: inline-block; padding: 2px 8px; border-radius: 20px;
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+}
+.recStatusCollected { background: #D1FAE5; color: #065F46; }
+.recStatusPaid      { background: #DBEAFE; color: #1E40AF; }
+.recStatusReturned  { background: #FEE2E2; color: #991B1B; }
+.recStatusPending   { background: #F3F4F6; color: #6B7280; }

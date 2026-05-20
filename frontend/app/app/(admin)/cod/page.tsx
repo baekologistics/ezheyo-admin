@@ -34,6 +34,13 @@ type WeeklyCustomer = {
   total_check_amount: string | number
   records: WeeklyRecord[]
 }
+type StmtRecord = {
+  id: string; tracking_no: string
+  cod_amount: string | number; check_amount: string | number
+  cod_status: string
+  customer_id: string | null; customer_name: string | null
+  customer_email: string | null; cod_payment_method: string | null
+}
 type PaidRecord = {
   id: string; tracking_no: string
   check_amount: string | number; payment_method: string
@@ -130,6 +137,82 @@ export default function CodPage() {
   const displayedStmts = showAllStmts
     ? statements
     : statements.filter(s => s.parsedStatus !== 'Parsed' || s.recordCount > 0)
+
+  // ── Statement checkbox selection + record preview ──────────────
+  const [selectedStmtIds, setSelectedStmtIds]     = useState<Set<string>>(new Set())
+  const [stmtRecords,     setStmtRecords]          = useState<StmtRecord[]>([])
+  const [loadingStmtRecs, setLoadingStmtRecs]      = useState(false)
+
+  const toggleStmtSelect = useCallback((id: string) => {
+    setSelectedStmtIds(prev => {
+      const n = new Set(prev)
+      n.has(id) ? n.delete(id) : n.add(id)
+      return n
+    })
+  }, [])
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedStmtIds(prev =>
+      prev.size === displayedStmts.length && displayedStmts.length > 0
+        ? new Set()
+        : new Set(displayedStmts.map(s => s.id))
+    )
+  }, [displayedStmts])
+
+  // Fetch records whenever selection changes
+  useEffect(() => {
+    if (selectedStmtIds.size === 0) { setStmtRecords([]); return }
+    let cancelled = false
+    const fetchAll = async () => {
+      setLoadingStmtRecs(true)
+      try {
+        const results = await Promise.all(
+          Array.from(selectedStmtIds).map(id =>
+            authFetch(`/api/cod/records?statement_id=${id}`).then(r => r.json() as Promise<StmtRecord[]>)
+          )
+        )
+        if (!cancelled) setStmtRecords(results.flat())
+      } catch {
+        if (!cancelled) showToast('Failed to load records')
+      } finally {
+        if (!cancelled) setLoadingStmtRecs(false)
+      }
+    }
+    fetchAll()
+    return () => { cancelled = true }
+  }, [selectedStmtIds, showToast])
+
+  // Group records by customer
+  const recordsByCustomer = useMemo(() => {
+    type Group = {
+      customer_id: string; customer_name: string; customer_email: string
+      cod_payment_method: string; records: StmtRecord[]
+    }
+    const map = new Map<string, Group>()
+    const unmatched: StmtRecord[] = []
+    for (const r of stmtRecords) {
+      if (!r.customer_id) { unmatched.push(r); continue }
+      if (!map.has(r.customer_id)) {
+        map.set(r.customer_id, {
+          customer_id:       r.customer_id,
+          customer_name:     r.customer_name    ?? '(unknown)',
+          customer_email:    r.customer_email   ?? '',
+          cod_payment_method: r.cod_payment_method ?? 'qb_bill',
+          records: [],
+        })
+      }
+      map.get(r.customer_id)!.records.push(r)
+    }
+    const groups = Array.from(map.values())
+    if (unmatched.length > 0) {
+      groups.push({
+        customer_id: '__unmatched__', customer_name: 'Unmatched',
+        customer_email: '', cod_payment_method: '',
+        records: unmatched,
+      })
+    }
+    return groups
+  }, [stmtRecords])
 
   // ═══ TAB 2: Weekly Payments ══════════════════════════════════════
   const defaultRange = useMemo(() => getLastWeekRange(), [])
@@ -302,6 +385,15 @@ export default function CodPage() {
             <table className={styles.stmtTable}>
               <thead>
                 <tr>
+                  <th style={{ width: 36, textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedStmtIds.size > 0 && selectedStmtIds.size === displayedStmts.length}
+                      ref={el => { if (el) el.indeterminate = selectedStmtIds.size > 0 && selectedStmtIds.size < displayedStmts.length }}
+                      onChange={toggleSelectAll}
+                      disabled={loadingStmts}
+                    />
+                  </th>
                   <th>Statement No</th>
                   <th>Date</th>
                   <th>Source</th>
@@ -312,11 +404,23 @@ export default function CodPage() {
               </thead>
               <tbody>
                 {loadingStmts ? (
-                  <tr><td colSpan={6} className={styles.empty}>Loading…</td></tr>
+                  <tr><td colSpan={7} className={styles.empty}>Loading…</td></tr>
                 ) : displayedStmts.length === 0 ? (
-                  <tr><td colSpan={6} className={styles.empty}>No statements found.</td></tr>
+                  <tr><td colSpan={7} className={styles.empty}>No statements found.</td></tr>
                 ) : displayedStmts.map(s => (
-                  <tr key={s.id}>
+                  <tr
+                    key={s.id}
+                    className={selectedStmtIds.has(s.id) ? styles.stmtRowSelected : undefined}
+                    onClick={() => toggleStmtSelect(s.id)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedStmtIds.has(s.id)}
+                        onChange={() => toggleStmtSelect(s.id)}
+                      />
+                    </td>
                     <td className={styles.stmtNo}>{s.statementNo}</td>
                     <td className={styles.muted}>{s.statementDate}</td>
                     <td>
@@ -337,6 +441,80 @@ export default function CodPage() {
               </tbody>
             </table>
           </div>
+
+          {/* ── COD Records preview for selected statements ───────── */}
+          {selectedStmtIds.size > 0 && (
+            <div className={styles.stmtRecordsSection}>
+              <div className={styles.stmtRecordsSectionHeader}>
+                <span className={styles.stmtRecordsSectionTitle}>COD Records</span>
+                <span className={styles.recordsCount}>
+                  {selectedStmtIds.size} statement{selectedStmtIds.size > 1 ? 's' : ''} · {stmtRecords.length} records
+                </span>
+              </div>
+
+              {loadingStmtRecs ? (
+                <div className={styles.empty}>Loading records…</div>
+              ) : recordsByCustomer.length === 0 ? (
+                <div className={styles.empty}>No records found.</div>
+              ) : recordsByCustomer.map(group => {
+                const groupTotal = group.records.reduce((a, r) => a + Number(r.check_amount), 0)
+                const isUnmatched = group.customer_id === '__unmatched__'
+                return (
+                  <div key={group.customer_id} className={`${styles.customerGroup} ${isUnmatched ? styles.customerGroupHeaderUnmatched : ''}`}>
+                    <div className={`${styles.customerGroupHeader} ${isUnmatched ? styles.customerGroupHeaderUnmatched : ''}`}>
+                      <div className={styles.customerGroupInfo}>
+                        <span className={styles.cgName}>{group.customer_name}</span>
+                        {group.customer_email && (
+                          <span className={styles.cgEmail}>{group.customer_email}</span>
+                        )}
+                        {!isUnmatched && (
+                          <span className={`${styles.payMethodBadge} ${group.cod_payment_method === 'zelle' ? styles.payMethodZelle : styles.payMethodQb}`}>
+                            {group.cod_payment_method === 'zelle' ? 'Zelle' : 'QB Bill'}
+                          </span>
+                        )}
+                      </div>
+                      <div className={styles.cgRight}>
+                        <span className={styles.cgTotal}>{fmt(groupTotal)}</span>
+                      </div>
+                    </div>
+                    <div className={styles.customerGroupRows}>
+                      <table className={styles.cgTable}>
+                        <thead>
+                          <tr>
+                            <th>Tracking No</th>
+                            <th className={styles.thRight}>COD Amount</th>
+                            <th className={styles.thRight}>Check Amount</th>
+                            <th>Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {group.records.map(r => (
+                            <tr key={r.id}>
+                              <td className={styles.tracking}>{r.tracking_no}</td>
+                              <td className={`${styles.thRight}`}>{fmt(r.cod_amount)}</td>
+                              <td className={`${styles.thRight} ${styles.bold}`}>{fmt(r.check_amount)}</td>
+                              <td>
+                                <span className={`${styles.recStatusBadge} ${
+                                  r.cod_status === 'collected' ? styles.recStatusCollected :
+                                  r.cod_status === 'paid'      ? styles.recStatusPaid      :
+                                  r.cod_status === 'returned'  ? styles.recStatusReturned  :
+                                                                 styles.recStatusPending
+                                }`}>
+                                  {r.cod_status === 'collected' ? 'Collected' :
+                                   r.cod_status === 'paid'      ? 'Paid'      :
+                                   r.cod_status === 'returned'  ? 'Returned'  : 'Pending'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 

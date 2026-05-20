@@ -196,6 +196,7 @@
 }
 .codPending   { background: #FEF3C7; color: #92400E; }
 .codCollected { background: #D1FAE5; color: #065F46; }
+.codPaid      { background: #DBEAFE; color: #1E40AF; }
 .codReturned  { background: #F3F4F6; color: #6B7280; }
 
 /* Claim status badge */

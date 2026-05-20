@@ -96,6 +96,15 @@ export async function uploadStatement(req: Request, res: Response, next: NextFun
           customerId, rec.isReturned, codStatus,
         ]
       )
+
+      // Sync orders.cod_status for matched tracking numbers
+      if (customerId) {
+        const orderStatus = rec.isReturned ? 'returned' : 'collected'
+        await client.query(
+          `UPDATE orders SET cod_status = $1 WHERE tracking_no = $2`,
+          [orderStatus, rec.trackingNo]
+        )
+      }
     }
 
     await client.query('COMMIT')
@@ -124,8 +133,9 @@ export async function getRecords(req: Request, res: Response, next: NextFunction
     const { statement_id } = req.query
     const base = `
       SELECT cr.*,
-             c.name  AS customer_name,
-             c.email AS customer_email,
+             c.name                                    AS customer_name,
+             c.email                                   AS customer_email,
+             COALESCE(c.cod_payment_method, 'qb_bill') AS cod_payment_method,
              s.statement_no, s.statement_date
       FROM cod_records cr
       LEFT JOIN customers      c ON cr.customer_id      = c.id
@@ -224,9 +234,9 @@ export async function updateRecordStatus(req: Request, res: Response, next: Next
     // Sync orders.cod_status for the tracking_no
     if (row.tracking_no) {
       const orderCodStatus =
-        cod_status === 'paid'      ? 'collected' :
-        cod_status === 'returned'  ? 'returned'  :
-        cod_status === 'collected' ? 'collected' : 'pending'
+        cod_status === 'paid'      ? 'paid'       :
+        cod_status === 'returned'  ? 'returned'   :
+        cod_status === 'collected' ? 'collected'  : 'pending'
       await pool.query(
         `UPDATE orders SET cod_status = $1 WHERE tracking_no = $2`,
         [orderCodStatus, row.tracking_no]

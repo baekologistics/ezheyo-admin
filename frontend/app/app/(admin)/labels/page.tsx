@@ -55,7 +55,7 @@ function calcPreset(preset: DatePreset): { from: string; to: string } {
 }
 
 // ── Types ─────────────────────────────────────────────────────
-type CodStatus   = 'Pending' | 'Collected' | 'Returned'
+type CodStatus   = 'Pending' | 'Collected' | 'Paid' | 'Returned'
 type ClaimStatus = 'Claimed' | 'Approved' | 'Paid'
 
 type Package = {
@@ -115,7 +115,7 @@ type ApiOrder = {
 type ApiResponse = { orders: ApiOrder[]; total: number; page: number; totalPages: number }
 
 function mapCod(s: string | null): CodStatus | null {
-  return ({ pending: 'Pending', collected: 'Collected', returned: 'Returned' } as Record<string, CodStatus>)[s?.toLowerCase() ?? ''] ?? null
+  return ({ pending: 'Pending', collected: 'Collected', paid: 'Paid', returned: 'Returned' } as Record<string, CodStatus>)[s?.toLowerCase() ?? ''] ?? null
 }
 function mapClaim(s: string | null): ClaimStatus | null {
   return ({ claimed: 'Claimed', approved: 'Approved', paid: 'Paid' } as Record<string, ClaimStatus>)[s?.toLowerCase() ?? ''] ?? null
@@ -146,7 +146,7 @@ function mapOrder(o: ApiOrder): Order {
 
 const fmt = (n: number) => `$${n.toFixed(2)}`
 const SERVICE_TYPES   = ['All', 'Ground', 'Next Day Air', '2nd Day Air']
-const COD_STATUSES    = ['All', 'Pending', 'Collected', 'Returned']
+const COD_STATUSES    = ['All', 'Pending', 'Collected', 'Paid', 'Returned']
 const CLAIM_STATUSES  = ['All', 'Claimed', 'Approved', 'Paid']
 const CANCEL_FILTERS  = ['All', 'Active', 'Cancelled'] as const
 type CancelFilter = typeof CANCEL_FILTERS[number]
@@ -617,6 +617,7 @@ export default function LabelsPage() {
                           <div className={styles.codCell}>
                             <span className={`${styles.codStatusBadge} ${
                               o.codStatus === 'Collected' ? styles.codCollected :
+                              o.codStatus === 'Paid'      ? styles.codPaid      :
                               o.codStatus === 'Returned'  ? styles.codReturned  : styles.codPending
                             }`}>{o.codStatus ?? 'Pending'}</span>
                             <span className={styles.codAmt}>{fmt(o.codAmount)}</span>
