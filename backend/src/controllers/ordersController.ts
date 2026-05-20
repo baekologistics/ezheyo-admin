@@ -1,6 +1,22 @@
 import { Request, Response, NextFunction } from 'express'
 import { pool } from '../config/database'
 
+// Effective COD status: cod_records is the source of truth;
+// falls back to orders.cod_status, then 'pending' for COD orders.
+const EFFECTIVE_COD = `COALESCE(
+  cr_cod.cod_status,
+  o.cod_status,
+  CASE WHEN o.cod_amount > 0 THEN 'pending' ELSE NULL END
+)`
+
+// Always left-join the latest cod_record for each order's tracking_no
+const COD_LATERAL = `LEFT JOIN LATERAL (
+  SELECT cod_status FROM cod_records
+  WHERE  tracking_no = o.tracking_no
+  ORDER  BY updated_at DESC NULLS LAST
+  LIMIT  1
+) cr_cod ON true`
+
 // ── Shared filter builder ─────────────────────────────────────
 function buildFilters(q: Record<string, string | undefined>) {
   const {
@@ -17,7 +33,7 @@ function buildFilters(q: Record<string, string | undefined>) {
   if (date_from)          { conditions.push(`o.date >= $${idx++}`);                values.push(date_from) }
   if (date_to)            { conditions.push(`o.date <= $${idx++}`);                values.push(date_to) }
   if (service_type)       { conditions.push(`o.service_type = $${idx++}`);         values.push(service_type) }
-  if (cod_status)         { conditions.push(`o.cod_status = $${idx++}`);           values.push(cod_status) }
+  if (cod_status)         { conditions.push(`(${EFFECTIVE_COD}) = $${idx++}`);     values.push(cod_status) }
   if (claim_status)       { conditions.push(`o.claim_status = $${idx++}`);         values.push(claim_status) }
   if (customer_name)      { conditions.push(`c.name ILIKE $${idx++}`);             values.push(`%${customer_name}%`) }
   if (cancelled === 'true')  { conditions.push(`o.customer_charge = 0`) }
@@ -33,9 +49,12 @@ function buildFilters(q: Record<string, string | undefined>) {
     needsCustomerSales = true
   }
 
-  const joinClause = needsCustomerSales
+  const baseJoin = needsCustomerSales
     ? 'LEFT JOIN customers c ON o.customer_id = c.id\n       INNER JOIN customer_sales cs ON cs.customer_id = o.customer_id'
     : 'LEFT JOIN customers c ON o.customer_id = c.id'
+
+  // COD_LATERAL always included so EFFECTIVE_COD expression is valid in WHERE + SELECT
+  const joinClause = `${baseJoin}\n       ${COD_LATERAL}`
 
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
   return { conditions, values, idx, where, joinClause }
@@ -71,7 +90,7 @@ export async function getOrders(req: Request, res: Response, next: NextFunction)
          o.customer_charge,
          CASE WHEN o.customer_charge = 0 THEN 0 ELSE GREATEST(o.profit, 0) END AS profit,
          o.sales_person,
-         o.cod_amount, o.cod_status, o.claim_status,
+         o.cod_amount, ${EFFECTIVE_COD} AS cod_status, o.claim_status,
          o.total_packages, o.packages
        FROM orders o
        ${joinClause}

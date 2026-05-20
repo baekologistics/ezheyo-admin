@@ -38,6 +38,9 @@ type StmtRecord = {
   id: string; tracking_no: string
   cod_amount: string | number; check_amount: string | number
   cod_status: string
+  check_no: string | null; pickup_date: string | null; delivery_date: string | null
+  premium_fee: string | number | null; service_fee: string | number | null
+  statement_no: string | null; statement_date: string | null
   customer_id: string | null; customer_name: string | null
   customer_email: string | null; cod_payment_method: string | null
 }
@@ -104,7 +107,10 @@ export default function CodPage() {
       const res = await authFetch('/api/cod/statements')
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json() as ApiStatement[]
-      setStatements(data.map(mapStatement))
+      const mapped = data.map(mapStatement)
+      setStatements(mapped)
+      // Auto-select all statements on load
+      setSelectedStmtIds(new Set(mapped.map(s => s.id)))
     } catch (err) {
       showToast(`Failed to load statements: ${(err as Error).message}`)
     } finally {
@@ -519,31 +525,50 @@ export default function CodPage() {
                         <thead>
                           <tr>
                             <th>Tracking No</th>
-                            <th className={styles.thRight}>COD Amount</th>
-                            <th className={styles.thRight}>Check Amount</th>
+                            <th>Statement No</th>
+                            <th>Check No</th>
+                            <th>Pickup</th>
+                            <th>Delivery</th>
+                            <th className={styles.thRight}>COD Amt</th>
+                            <th className={styles.thRight}>Premium</th>
+                            <th className={styles.thRight}>Service</th>
+                            <th className={styles.thRight}>Check Amt</th>
+                            <th className={styles.thRight}>Diff</th>
                             <th>Status</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {group.records.map(r => (
-                            <tr key={r.id}>
-                              <td className={styles.tracking}>{r.tracking_no}</td>
-                              <td className={`${styles.thRight}`}>{fmt(r.cod_amount)}</td>
-                              <td className={`${styles.thRight} ${styles.bold}`}>{fmt(r.check_amount)}</td>
-                              <td>
-                                <span className={`${styles.recStatusBadge} ${
-                                  r.cod_status === 'collected' ? styles.recStatusCollected :
-                                  r.cod_status === 'paid'      ? styles.recStatusPaid      :
-                                  r.cod_status === 'returned'  ? styles.recStatusReturned  :
-                                                                 styles.recStatusPending
-                                }`}>
-                                  {r.cod_status === 'collected' ? 'Collected' :
-                                   r.cod_status === 'paid'      ? 'Paid'      :
-                                   r.cod_status === 'returned'  ? 'Returned'  : 'Pending'}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
+                          {group.records.map(r => {
+                            const diff = Number(r.cod_amount) - Number(r.check_amount)
+                            return (
+                              <tr key={r.id}>
+                                <td className={styles.tracking}>{r.tracking_no}</td>
+                                <td className={styles.mono}>{r.statement_no ?? '—'}</td>
+                                <td className={styles.mono}>{r.check_no ?? '—'}</td>
+                                <td className={styles.muted}>{fmtDate(r.pickup_date)}</td>
+                                <td className={styles.muted}>{fmtDate(r.delivery_date)}</td>
+                                <td className={styles.thRight}>{fmt(r.cod_amount)}</td>
+                                <td className={styles.thRight}>{r.premium_fee != null && Number(r.premium_fee) !== 0 ? fmt(r.premium_fee) : '—'}</td>
+                                <td className={styles.thRight}>{r.service_fee != null && Number(r.service_fee) !== 0 ? fmt(r.service_fee) : '—'}</td>
+                                <td className={`${styles.thRight} ${styles.bold}`}>{fmt(r.check_amount)}</td>
+                                <td className={`${styles.thRight} ${Math.abs(diff) > 0.005 ? styles.diffMismatch : styles.muted}`}>
+                                  {Math.abs(diff) > 0.005 ? fmt(diff) : '—'}
+                                </td>
+                                <td>
+                                  <span className={`${styles.recStatusBadge} ${
+                                    r.cod_status === 'collected' ? styles.recStatusCollected :
+                                    r.cod_status === 'paid'      ? styles.recStatusPaid      :
+                                    r.cod_status === 'returned'  ? styles.recStatusReturned  :
+                                                                   styles.recStatusPending
+                                  }`}>
+                                    {r.cod_status === 'collected' ? 'Collected' :
+                                     r.cod_status === 'paid'      ? 'Paid'      :
+                                     r.cod_status === 'returned'  ? 'Returned'  : 'Pending'}
+                                  </span>
+                                </td>
+                              </tr>
+                            )
+                          })}
                         </tbody>
                       </table>
                     </div>

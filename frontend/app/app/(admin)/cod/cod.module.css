@@ -138,7 +138,8 @@
 
 .customerGroupHeader {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 20px; background: var(--surface); gap: 16px;
+  padding: 12px 20px; background: #FFF3ED; border-left: 3px solid #E85D26;
+  gap: 16px; font-weight: 700;
 }
 .customerGroupHeaderUnmatched {
   background: #FEF2F2 !important;
@@ -685,6 +686,9 @@
 .recStatusPaid      { background: #DBEAFE; color: #1E40AF; }
 .recStatusReturned  { background: #FEE2E2; color: #991B1B; }
 .recStatusPending   { background: #F3F4F6; color: #6B7280; }
+
+/* ── Diff mismatch highlight ────────────────────────────────── */
+.diffMismatch { color: #DC2626; font-weight: 600; }
 
 /* ── Statement delete button (shown when rows selected) ─────── */
 .stmtDeleteBtn {
