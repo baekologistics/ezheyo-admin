@@ -685,6 +685,50 @@
   font-size: 13px; font-weight: 600; color: var(--text);
 }
 
+/* Stats row */
+.recStatsRow {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 0; border-bottom: 1px solid var(--border);
+}
+.recStatCard {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 12px 20px; border-right: 1px solid var(--border);
+}
+.recStatCard:last-child { border-right: none; }
+.recStatLabel {
+  font-size: 10px; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .06em;
+}
+.recStatVal {
+  font-size: 20px; font-weight: 700; color: var(--text);
+}
+.recStatCollected { background: #F0FDF4; }
+.recStatCollected .recStatVal { color: #059669; }
+.recStatReturned  { background: #FFF0F0; }
+.recStatReturned  .recStatVal { color: #DC2626; }
+
+/* Search bar */
+.recSearchBar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 20px; border-bottom: 1px solid var(--border);
+  background: var(--white);
+}
+.recSearchInput {
+  flex: 1; height: 34px; padding: 0 10px;
+  border: 1px solid var(--border); border-radius: 7px;
+  font-size: 13px; font-family: inherit; color: var(--text);
+  background: var(--white); outline: none;
+}
+.recSearchInput:focus { border-color: var(--orange); }
+.recSearchClear {
+  height: 28px; width: 28px;
+  background: none; border: none;
+  font-size: 12px; color: var(--muted);
+  cursor: pointer; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.recSearchClear:hover { background: var(--surface); color: var(--text); }
+
 /* Status badges for records in statement preview */
 .recStatusBadge {
   display: inline-block; padding: 2px 8px; border-radius: 20px;

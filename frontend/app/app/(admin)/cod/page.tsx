@@ -222,37 +222,58 @@ export default function CodPage() {
     return () => { cancelled = true }
   }, [selectedStmtIds, showToast])
 
-  // Group records by customer
+  // Search within COD Records section
+  const [recSearch, setRecSearch] = useState('')
+
+  // Group matched records by customer (unmatched customer_id IS NULL are excluded)
   const recordsByCustomer = useMemo(() => {
     type Group = {
       customer_id: string; customer_name: string; customer_email: string
       cod_payment_method: string; records: StmtRecord[]
     }
     const map = new Map<string, Group>()
-    const unmatched: StmtRecord[] = []
     for (const r of stmtRecords) {
-      if (!r.customer_id) { unmatched.push(r); continue }
+      if (!r.customer_id) continue  // hide unmatched
       if (!map.has(r.customer_id)) {
         map.set(r.customer_id, {
-          customer_id:       r.customer_id,
-          customer_name:     r.customer_name    ?? '(unknown)',
-          customer_email:    r.customer_email   ?? '',
+          customer_id:        r.customer_id,
+          customer_name:      r.customer_name     ?? '(unknown)',
+          customer_email:     r.customer_email    ?? '',
           cod_payment_method: r.cod_payment_method ?? 'qb_bill',
           records: [],
         })
       }
       map.get(r.customer_id)!.records.push(r)
     }
-    const groups = Array.from(map.values())
-    if (unmatched.length > 0) {
-      groups.push({
-        customer_id: '__unmatched__', customer_name: 'Unmatched',
-        customer_email: '', cod_payment_method: '',
-        records: unmatched,
-      })
-    }
-    return groups
+    return Array.from(map.values())
   }, [stmtRecords])
+
+  // Stats over matched records only
+  const recStats = useMemo(() => {
+    const matched = stmtRecords.filter(r => r.customer_id)
+    return {
+      customers:   recordsByCustomer.length,
+      totalAmount: matched.reduce((a, r) => a + Number(r.check_amount), 0),
+      collected:   matched.filter(r => r.cod_status === 'collected').length,
+      returned:    matched.filter(r => r.cod_status === 'returned').length,
+    }
+  }, [stmtRecords, recordsByCustomer])
+
+  // Apply search filter: tracking_no, statement_no, check_amount (partial match)
+  const filteredRecordsByCustomer = useMemo(() => {
+    const q = recSearch.trim().toLowerCase()
+    if (!q) return recordsByCustomer
+    return recordsByCustomer
+      .map(g => ({
+        ...g,
+        records: g.records.filter(r =>
+          r.tracking_no?.toLowerCase().includes(q) ||
+          r.statement_no?.toLowerCase().includes(q) ||
+          String(Number(r.check_amount).toFixed(2)).includes(q)
+        ),
+      }))
+      .filter(g => g.records.length > 0)
+  }, [recordsByCustomer, recSearch])
 
   // ═══ TAB 2: Weekly Payments ══════════════════════════════════════
   const defaultRange = useMemo(() => getLastWeekRange(), [])
@@ -493,30 +514,64 @@ export default function CodPage() {
               <div className={styles.stmtRecordsSectionHeader}>
                 <span className={styles.stmtRecordsSectionTitle}>COD Records</span>
                 <span className={styles.recordsCount}>
-                  {selectedStmtIds.size} statement{selectedStmtIds.size > 1 ? 's' : ''} · {stmtRecords.length} records
+                  {selectedStmtIds.size} statement{selectedStmtIds.size > 1 ? 's' : ''} · {stmtRecords.filter(r => r.customer_id).length} records
                 </span>
               </div>
 
+              {/* Stats cards */}
+              {!loadingStmtRecs && stmtRecords.length > 0 && (
+                <div className={styles.recStatsRow}>
+                  <div className={styles.recStatCard}>
+                    <span className={styles.recStatLabel}>CUSTOMERS</span>
+                    <span className={styles.recStatVal}>{recStats.customers}</span>
+                  </div>
+                  <div className={styles.recStatCard}>
+                    <span className={styles.recStatLabel}>TOTAL AMOUNT</span>
+                    <span className={styles.recStatVal}>{fmt(recStats.totalAmount)}</span>
+                  </div>
+                  <div className={`${styles.recStatCard} ${recStats.collected > 0 ? styles.recStatCollected : ''}`}>
+                    <span className={styles.recStatLabel}>COLLECTED</span>
+                    <span className={styles.recStatVal}>{recStats.collected}</span>
+                  </div>
+                  <div className={`${styles.recStatCard} ${recStats.returned > 0 ? styles.recStatReturned : ''}`}>
+                    <span className={styles.recStatLabel}>RETURNED</span>
+                    <span className={styles.recStatVal}>{recStats.returned}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Search bar */}
+              {!loadingStmtRecs && stmtRecords.length > 0 && (
+                <div className={styles.recSearchBar}>
+                  <input
+                    className={styles.recSearchInput}
+                    placeholder="Search tracking no, statement no, amount…"
+                    value={recSearch}
+                    onChange={e => setRecSearch(e.target.value)}
+                  />
+                  {recSearch && (
+                    <button className={styles.recSearchClear} onClick={() => setRecSearch('')}>✕</button>
+                  )}
+                </div>
+              )}
+
               {loadingStmtRecs ? (
                 <div className={styles.empty}>Loading records…</div>
-              ) : recordsByCustomer.length === 0 ? (
-                <div className={styles.empty}>No records found.</div>
-              ) : recordsByCustomer.map(group => {
+              ) : filteredRecordsByCustomer.length === 0 ? (
+                <div className={styles.empty}>{recSearch ? 'No records match your search.' : 'No records found.'}</div>
+              ) : filteredRecordsByCustomer.map(group => {
                 const groupTotal = group.records.reduce((a, r) => a + Number(r.check_amount), 0)
-                const isUnmatched = group.customer_id === '__unmatched__'
                 return (
-                  <div key={group.customer_id} className={`${styles.customerGroup} ${isUnmatched ? styles.customerGroupHeaderUnmatched : ''}`}>
-                    <div className={`${styles.customerGroupHeader} ${isUnmatched ? styles.customerGroupHeaderUnmatched : ''}`}>
+                  <div key={group.customer_id} className={styles.customerGroup}>
+                    <div className={styles.customerGroupHeader}>
                       <div className={styles.customerGroupInfo}>
                         <span className={styles.cgName}>{group.customer_name}</span>
                         {group.customer_email && (
                           <span className={styles.cgEmail}>{group.customer_email}</span>
                         )}
-                        {!isUnmatched && (
-                          <span className={`${styles.payMethodBadge} ${group.cod_payment_method === 'zelle' ? styles.payMethodZelle : styles.payMethodQb}`}>
-                            {group.cod_payment_method === 'zelle' ? 'Zelle' : 'QB Bill'}
-                          </span>
-                        )}
+                        <span className={`${styles.payMethodBadge} ${group.cod_payment_method === 'zelle' ? styles.payMethodZelle : styles.payMethodQb}`}>
+                          {group.cod_payment_method === 'zelle' ? 'Zelle' : 'QB Bill'}
+                        </span>
                       </div>
                       <div className={styles.cgRight}>
                         <span className={styles.cgTotal}>{fmt(groupTotal)}</span>
