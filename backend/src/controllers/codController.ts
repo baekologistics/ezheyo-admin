@@ -611,6 +611,43 @@ export async function undoBatchPaid(req: Request, res: Response, next: NextFunct
   }
 }
 
+// ── GET /api/cod/summary ─────────────────────────────────────
+// Card 1: count of COD orders not yet collected (cod_status NULL or 'pending')
+// Card 2: sum of cod_amount for those same orders
+// Card 3: most recent cod_statement (date + statement_no)
+export async function getSummary(_req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const [pendingResult, latestResult] = await Promise.all([
+      pool.query(`
+        SELECT
+          COUNT(*)                       AS pending_count,
+          COALESCE(SUM(cod_amount), 0)   AS pending_amount
+        FROM orders
+        WHERE cod_amount > 0
+          AND (cod_status IS NULL OR cod_status = '' OR cod_status = 'pending')
+      `),
+      pool.query(`
+        SELECT statement_no, statement_date
+        FROM cod_statements
+        ORDER BY statement_date DESC NULLS LAST
+        LIMIT 1
+      `),
+    ])
+
+    const pr  = pendingResult.rows[0]  as Record<string, unknown>
+    const lr  = (latestResult.rows[0]  as Record<string, unknown>) ?? {}
+
+    res.json({
+      pending_count:   parseInt(String(pr.pending_count))        || 0,
+      pending_amount:  parseFloat(String(pr.pending_amount))     || 0,
+      latest_statement_no:   (lr.statement_no   as string) ?? null,
+      latest_statement_date: (lr.statement_date as string) ?? null,
+    })
+  } catch (err) {
+    next(err)
+  }
+}
+
 // ── POST /api/cod/records/:id/email (stub) ───────────────────
 export async function sendEmail(_req: Request, res: Response): Promise<void> {
   res.json({ message: 'Email send not yet implemented' })

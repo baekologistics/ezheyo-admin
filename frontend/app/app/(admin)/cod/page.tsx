@@ -94,6 +94,21 @@ export default function CodPage() {
     setTimeout(() => setToast(''), 4000)
   }, [])
 
+  // ═══ Summary Cards ═══════════════════════════════════════════════
+  type CodSummary = {
+    pending_count: number; pending_amount: number
+    latest_statement_no: string | null; latest_statement_date: string | null
+  }
+  const [summary, setSummary] = useState<CodSummary | null>(null)
+
+  const loadSummary = useCallback(async () => {
+    try {
+      const res = await authFetch('/api/cod/summary')
+      if (!res.ok) return
+      setSummary(await res.json() as CodSummary)
+    } catch { /* non-critical */ }
+  }, [])
+
   // ═══ TAB 1: Statements ═══════════════════════════════════════════
   const [statements,    setStatements]  = useState<CodStatement[]>([])
   const [loadingStmts,  setLoadingStmts] = useState(true)
@@ -388,6 +403,7 @@ export default function CodPage() {
   }, [paidHistory, historySearch])
 
   // ═══ Lifecycle ═══════════════════════════════════════════════════
+  useEffect(() => { loadSummary() }, [loadSummary])
   useEffect(() => { loadStatements() }, [loadStatements])
   useEffect(() => {
     if (activeTab === 'weekly' && !weeklyLoaded) loadWeeklyPayments(weekStart, weekEnd)
@@ -401,6 +417,31 @@ export default function CodPage() {
     <div className={styles.page}>
       {toast && <div className={styles.toast}>{toast}</div>}
       <input ref={fileInputRef} type="file" accept=".pdf" style={{ display: 'none' }} onChange={handleFileChange} />
+
+      {/* ── Summary Cards ────────────────────────────────────────── */}
+      {summary && (
+        <div className={styles.summaryCards}>
+          <div className={styles.summaryCard}>
+            <span className={styles.summaryCardLabel}>COD Pending</span>
+            <span className={styles.summaryCardVal}>{summary.pending_count.toLocaleString()}</span>
+            <span className={styles.summaryCardSub}>shipments awaiting collection</span>
+          </div>
+          <div className={styles.summaryCard}>
+            <span className={styles.summaryCardLabel}>Pending Amount</span>
+            <span className={styles.summaryCardVal}>{fmt(summary.pending_amount)}</span>
+            <span className={styles.summaryCardSub}>total COD not yet collected</span>
+          </div>
+          <div className={`${styles.summaryCard} ${styles.summaryCardAccent}`}>
+            <span className={styles.summaryCardLabel}>Latest Statement</span>
+            <span className={styles.summaryCardVal}>
+              {summary.latest_statement_date ? fmtDate(summary.latest_statement_date) : '—'}
+            </span>
+            <span className={styles.summaryCardSub}>
+              {summary.latest_statement_no ?? '—'}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* ── Tab Nav ──────────────────────────────────────────────── */}
       <div className={styles.tabNav}>

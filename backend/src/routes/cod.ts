@@ -6,6 +6,7 @@ import {
   sendEmail, createQbBill,
   getWeeklyPayments, getPayable, getPaidHistory,
   createBatch, getBatches, markBatchPaid, undoBatchPaid,
+  getSummary,
 } from '../controllers/codController'
 
 const router = Router()
@@ -19,6 +20,9 @@ const upload = multer({
     cb(null, ok)
   },
 })
+
+// ── Summary ───────────────────────────────────────────────────
+router.get('/summary',                getSummary)
 
 // ── Statements ────────────────────────────────────────────────
 router.get('/statements',             getStatements)
