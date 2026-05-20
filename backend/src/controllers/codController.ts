@@ -65,12 +65,26 @@ export async function uploadStatement(req: Request, res: Response, next: NextFun
       }
     }
 
+    // referenceNo (package reference) → returned check details
+    // Used to store returned_reason and returned_date on matched records.
+    const returnedMap = new Map<string, { reason: string; returnedDate: string | null }>()
+    for (const rc of stmt.returnedChecks) {
+      returnedMap.set(rc.referenceNo.toLowerCase(), {
+        reason:       rc.reason,
+        returnedDate: rc.returnedDate || null,
+      })
+    }
+
     let matched = 0, unmatched = 0, returned = 0
 
     for (const rec of stmt.records) {
-      const customerId = trackingMap.get(rec.trackingNo) ?? null
+      const customerId    = trackingMap.get(rec.trackingNo) ?? null
       if (customerId) matched++; else unmatched++
       if (rec.isReturned) returned++
+
+      const returnedInfo   = returnedMap.get(rec.referenceNo.toLowerCase())
+      const returnedReason = returnedInfo?.reason      ?? null
+      const returnedDate   = returnedInfo?.returnedDate ?? null
 
       // Determine initial cod_status
       let codStatus = 'pending'
@@ -82,18 +96,21 @@ export async function uploadStatement(req: Request, res: Response, next: NextFun
            (id, cod_statement_id, order_id, reference_no, tracking_no,
             pickup_date, delivery_date, cod_amount, check_no,
             service_fee, premium_fee, check_amount,
-            customer_id, returned, cod_status)
+            customer_id, returned, cod_status,
+            package_reference, returned_reason, returned_date)
          VALUES
            (gen_random_uuid(), $1, NULL, $2, $3,
             $4, $5, $6, $7,
             $8, $9, $10,
-            $11, $12, $13)`,
+            $11, $12, $13,
+            $14, $15, $16)`,
         [
           savedStmt.id, rec.referenceNo, rec.trackingNo,
           rec.pickupDate || null, rec.deliveryDate || null,
           rec.codAmount, rec.checkNo || null,
           rec.serviceFee, rec.premiumFee, rec.checkAmount,
           customerId, rec.isReturned, codStatus,
+          rec.referenceNo || null, returnedReason, returnedDate || null,
         ]
       )
 
@@ -322,17 +339,19 @@ export async function getWeeklyPayments(req: Request, res: Response, next: NextF
           FILTER (WHERE cr.cod_status = 'collected') AS unpaid_amount,
         SUM(cr.check_amount)                        AS total_check_amount,
         json_agg(json_build_object(
-          'id',            cr.id,
-          'tracking_no',   cr.tracking_no,
-          'cod_amount',    cr.cod_amount,
-          'check_amount',  cr.check_amount,
-          'check_no',      cr.check_no,
-          'pickup_date',   cr.pickup_date,
-          'delivery_date', cr.delivery_date,
-          'cod_status',    cr.cod_status,
-          'payment_method',COALESCE(cr.payment_method, c.cod_payment_method, 'qb_bill'),
-          'statement_no',  s.statement_no,
-          'statement_date',s.statement_date
+          'id',              cr.id,
+          'tracking_no',     cr.tracking_no,
+          'cod_amount',      cr.cod_amount,
+          'check_amount',    cr.check_amount,
+          'check_no',        cr.check_no,
+          'pickup_date',     cr.pickup_date,
+          'delivery_date',   cr.delivery_date,
+          'cod_status',      cr.cod_status,
+          'returned_reason', cr.returned_reason,
+          'returned_date',   cr.returned_date,
+          'payment_method',  COALESCE(cr.payment_method, c.cod_payment_method, 'qb_bill'),
+          'statement_no',    s.statement_no,
+          'statement_date',  s.statement_date
         ) ORDER BY cr.pickup_date ASC NULLS LAST) AS records
       FROM cod_records cr
       JOIN  customers      c ON cr.customer_id      = c.id

@@ -247,7 +247,15 @@
 
 /* Row states (used in cgTable) */
 .rowPaid     td { background: #F0FDF4; }
-.rowReturned td { background: #F8FAFC; color: var(--muted); }
+.rowReturned td { background: #FFF0F0; }
+
+/* Returned warning badge on weekly customer cards */
+.returnedWarningBadge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 9px; border-radius: 20px;
+  background: #FEE2E2; color: #991B1B;
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+}
 
 /* ── QB Bill Modal ─────────────────────────────────────────── */
 .qbGroupBox {
@@ -541,7 +549,7 @@
   font-size: 11px; font-weight: 600; color: #059669; white-space: nowrap;
 }
 .recordStatusReturned {
-  font-size: 11px; font-weight: 500; color: var(--muted); white-space: nowrap;
+  font-size: 11px; font-weight: 600; color: #991B1B; white-space: nowrap;
 }
 
 /* ── Weekly Payments Tab ────────────────────────────────────── */

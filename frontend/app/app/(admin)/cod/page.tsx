@@ -23,6 +23,7 @@ type WeeklyRecord = {
   cod_amount: number; check_amount: number; check_no: string
   pickup_date: string; delivery_date: string
   cod_status: 'collected' | 'paid' | 'returned'
+  returned_reason: string | null; returned_date: string | null
   payment_method: string
   statement_no: string; statement_date: string
 }
@@ -41,6 +42,7 @@ type StmtRecord = {
   check_no: string | null; pickup_date: string | null; delivery_date: string | null
   premium_fee: string | number | null; service_fee: string | number | null
   statement_no: string | null; statement_date: string | null
+  returned_reason: string | null; returned_date: string | null
   customer_id: string | null; customer_name: string | null
   customer_email: string | null; cod_payment_method: string | null
 }
@@ -541,7 +543,7 @@ export default function CodPage() {
                           {group.records.map(r => {
                             const diff = Number(r.cod_amount) - Number(r.check_amount)
                             return (
-                              <tr key={r.id}>
+                              <tr key={r.id} className={r.cod_status === 'returned' ? styles.rowReturned : undefined}>
                                 <td className={styles.tracking}>{r.tracking_no}</td>
                                 <td className={styles.mono}>{r.statement_no ?? '—'}</td>
                                 <td className={styles.mono}>{r.check_no ?? '—'}</td>
@@ -555,15 +557,19 @@ export default function CodPage() {
                                   {Math.abs(diff) > 0.005 ? fmt(diff) : '—'}
                                 </td>
                                 <td>
-                                  <span className={`${styles.recStatusBadge} ${
-                                    r.cod_status === 'collected' ? styles.recStatusCollected :
-                                    r.cod_status === 'paid'      ? styles.recStatusPaid      :
-                                    r.cod_status === 'returned'  ? styles.recStatusReturned  :
-                                                                   styles.recStatusPending
-                                  }`}>
+                                  <span
+                                    className={`${styles.recStatusBadge} ${
+                                      r.cod_status === 'collected' ? styles.recStatusCollected :
+                                      r.cod_status === 'paid'      ? styles.recStatusPaid      :
+                                      r.cod_status === 'returned'  ? styles.recStatusReturned  :
+                                                                     styles.recStatusPending
+                                    }`}
+                                    title={r.cod_status === 'returned' && r.returned_reason ? r.returned_reason : undefined}
+                                  >
                                     {r.cod_status === 'collected' ? 'Collected' :
                                      r.cod_status === 'paid'      ? 'Paid'      :
-                                     r.cod_status === 'returned'  ? 'Returned'  : 'Pending'}
+                                     r.cod_status === 'returned'  ? (r.returned_reason ? `Returned (${r.returned_reason})` : 'Returned') :
+                                                                    'Pending'}
                                   </span>
                                 </td>
                               </tr>
@@ -660,7 +666,8 @@ export default function CodPage() {
           ) : (
             <div className={styles.weeklyCards}>
               {weeklyData.map(customer => {
-                const unpaid = customer.records.filter(r => r.cod_status === 'collected').length
+                const unpaid    = customer.records.filter(r => r.cod_status === 'collected').length
+                const returnedN = customer.records.filter(r => r.cod_status === 'returned').length
                 return (
                   <div key={customer.customer_id} className={styles.weekCard}>
                     {/* Card Header */}
@@ -678,6 +685,9 @@ export default function CodPage() {
                           {customer.cod_payment_method === 'zelle' ? 'Zelle' : 'QB Bill'}
                           <span className={styles.methodToggleHint}> ↕</span>
                         </button>
+                        {returnedN > 0 && (
+                          <span className={styles.returnedWarningBadge}>⚠ {returnedN} Returned</span>
+                        )}
                       </div>
                       <div className={styles.weekCardRight}>
                         <span className={styles.weekCardAmount}>{fmt(customer.total_check_amount)}</span>
@@ -696,7 +706,7 @@ export default function CodPage() {
                               Mark Paid ({unpaid})
                             </button>
                           )}
-                          {unpaid === 0 && (
+                          {unpaid === 0 && returnedN === 0 && (
                             <span className={styles.allPaidBadge}>✓ All Paid</span>
                           )}
                         </div>
@@ -739,7 +749,12 @@ export default function CodPage() {
                                 ) : r.cod_status === 'paid' ? (
                                   <span className={styles.recordStatusPaid}>✓ Paid</span>
                                 ) : (
-                                  <span className={styles.recordStatusReturned}>↩ Returned</span>
+                                  <span
+                                    className={styles.recordStatusReturned}
+                                    title={r.returned_reason ?? undefined}
+                                  >
+                                    ↩ Returned{r.returned_reason ? ` (${r.returned_reason})` : ''}
+                                  </span>
                                 )}
                               </td>
                             </tr>
